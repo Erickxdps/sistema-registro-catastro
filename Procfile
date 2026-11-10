@@ -1,1 +1,1 @@
-web: python app/run.py
+web: gunicorn --chdir app run:app --bind 0.0.0.0:$PORT --workers 2 --preload --timeout 120

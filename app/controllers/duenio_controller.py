@@ -14,6 +14,7 @@ from sqlalchemy import or_
 from models.duenio_model import Duenio
 from views import duenio_view
 from utils.decorators import role_required
+from utils.pagination import obtener_paginacion
 from utils.validators import validar_texto, validar_ci
 from database import db
 
@@ -26,9 +27,7 @@ duenio_bp = Blueprint("duenio", __name__)
 @login_required
 def list_duenios():
     """Lista paginada de propietarios con búsqueda por nombre, apellidos o CI."""
-    page     = request.args.get('page',     1,   type=int)
-    per_page = request.args.get('per_page', 10,  type=int)
-    search   = request.args.get('search',   '',  type=str)
+    page, per_page, search = obtener_paginacion(default_per_page=10)
 
     query = Duenio.query
     if search:
@@ -42,7 +41,7 @@ def list_duenios():
             )
         )
 
-    duenios_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+    duenios_paginated = query.order_by(Duenio.id).paginate(page=page, per_page=per_page, error_out=False)
     return duenio_view.list_duenios(duenios_paginated, search)
 
 

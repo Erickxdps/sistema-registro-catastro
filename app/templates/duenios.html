@@ -101,6 +101,7 @@
                             </a>
                             <form method="post" action="{{ url_for('duenio.delete_duenio', id=duenio.id) }}"
                                   data-confirm="¿Eliminar a {{ duenio.nombre }} {{ duenio.paterno }} y sus terrenos asociados?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
                                     <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
                                 </button>

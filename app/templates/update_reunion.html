@@ -11,6 +11,7 @@
         <md-elevation></md-elevation>
 
         <form method="post" id="updateReunionForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <md-outlined-text-field
                     label="Descripción / Tema"

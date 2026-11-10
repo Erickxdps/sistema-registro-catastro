@@ -11,6 +11,7 @@
         <md-elevation></md-elevation>
 
         <form method="post" id="createTerrenoForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
                     <span class="material-symbols-outlined" style="font-size: 18px;">person_pin</span>

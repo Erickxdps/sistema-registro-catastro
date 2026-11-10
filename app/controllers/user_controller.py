@@ -4,10 +4,12 @@
 
 from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash
 from sqlalchemy.exc import IntegrityError
 
 from utils.decorators import role_required
+from utils.http import es_url_interna
+from utils.pagination import obtener_paginacion
+from utils.validators import validar_texto, validar_rol
 from views import user_view
 from models.user_model import User
 from models.asistencia_model import Asistencia
@@ -23,7 +25,11 @@ user_bp = Blueprint("user", __name__)
 
 # ─────────────────────────── PÁGINA PRINCIPAL ────────────────────────────────
 
+MIN_PASSWORD_LEN = 8
+
+
 @user_bp.route('/')
+@login_required  # El directorio contiene nombres y CI: nunca público
 def index():
     """Página de inicio con estadísticas y directorio paginado de propietarios."""
     # Conteos para las tarjetas de estadísticas (queries ligeras)
@@ -35,9 +41,7 @@ def index():
     cuotas_count = db.session.query(Cuota.titulo).distinct().count()
 
     # Paginación y búsqueda del directorio de propietarios
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    search = request.args.get('search', '', type=str)
+    page, per_page, search = obtener_paginacion(default_per_page=10)
 
     query = Duenio.query
     if search:
@@ -49,7 +53,7 @@ def index():
             (Duenio.ci.ilike(filtro))
         )
 
-    duenos_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+    duenos_paginated = query.order_by(Duenio.id).paginate(page=page, per_page=per_page, error_out=False)
 
     # Función auxiliar para sumar multas de una lista
     def total_multas(lista_multas):
@@ -71,8 +75,9 @@ def index():
 
 @user_bp.route("/users")
 @login_required
+@role_required("admin")
 def list_users():
-    """Lista todos los usuarios del sistema. Solo accesible con sesión activa."""
+    """Lista todos los usuarios del sistema. Solo administradores."""
     users = User.get_all()
     return user_view.usuarios(users)
 
@@ -90,10 +95,13 @@ def login():
             return user_view.login()
 
         user = User.get_user_by_username(username)
-        if user and check_password_hash(user.password_hash, password):
+        if user and user.check_password(password):
             login_user(user)
             flash("Inicio de sesión exitoso.", "success")
-            # Redirigir según el rol
+            # Volver a la página solicitada solo si es una ruta interna (evita open redirect)
+            destino = request.args.get("next")
+            if es_url_interna(destino):
+                return redirect(destino)
             if user.has_role("admin"):
                 return redirect(url_for("user.list_users"))
             return redirect(url_for("user.profile", id=user.id))
@@ -118,18 +126,18 @@ def logout():
 def create_user():
     """Crea un nuevo usuario en el sistema."""
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        ok_user, username, err_user = validar_texto(request.form.get("username"), "Nombre de usuario", min_len=3, max_len=100)
         password = request.form.get("password", "")
-        role = request.form.get("role", "doctor")
+        ok_rol, role, err_rol = validar_rol(request.form.get("role", "doctor"))
 
-        # Validación de campos requeridos
-        if not username or not password:
-            flash("El nombre de usuario y la contraseña son obligatorios.", "error")
+        if not ok_user:
+            flash(err_user, "error")
             return user_view.registro()
-
-        # Validar que el rol sea uno de los permitidos
-        if role not in ("admin", "doctor"):
-            flash("El rol seleccionado no es válido.", "error")
+        if len(password) < MIN_PASSWORD_LEN:
+            flash(f"La contraseña debe tener al menos {MIN_PASSWORD_LEN} caracteres.", "error")
+            return user_view.registro()
+        if not ok_rol:
+            flash(err_rol, "error")
             return user_view.registro()
 
         try:
@@ -155,13 +163,25 @@ def update_user(id):
         return redirect(url_for("user.list_users"))
 
     if request.method == "POST":
-        nuevo_password = request.form.get("password", "").strip()
-        nuevo_role = request.form.get("role", "").strip()
+        nuevo_password = request.form.get("password", "")
+        nuevo_role = request.form.get("role", "").strip().lower()
 
         # Solo actualizar la contraseña si se proporcionó una nueva
-        if nuevo_password:
+        if nuevo_password.strip():
+            if len(nuevo_password) < MIN_PASSWORD_LEN:
+                flash(f"La contraseña debe tener al menos {MIN_PASSWORD_LEN} caracteres.", "error")
+                return user_view.actualizar(user)
             user.set_password(nuevo_password)
-        if nuevo_role and nuevo_role in ("admin", "doctor"):
+
+        if nuevo_role:
+            if nuevo_role not in ("admin", "doctor"):
+                flash("El rol seleccionado no es válido.", "error")
+                return user_view.actualizar(user)
+            # No dejar el sistema sin administradores
+            if user.has_role("admin") and nuevo_role != "admin" and _contar_admins() <= 1:
+                db.session.rollback()
+                flash("No puedes quitar el rol al último administrador.", "error")
+                return user_view.actualizar(user)
             user.role = nuevo_role
 
         try:
@@ -204,12 +224,19 @@ def delete_user(id):
 @user_bp.route("/profile/<int:id>")
 @login_required
 def profile(id):
-    """Muestra el perfil de un usuario."""
+    """Muestra el perfil de un usuario: el propio, o cualquiera si es administrador."""
+    if id != current_user.id and not current_user.has_role("admin"):
+        flash("Solo puedes ver tu propio perfil.", "error")
+        return redirect(url_for("user.profile", id=current_user.id))
     user = User.get_by_id(id)
     if not user:
         flash("Usuario no encontrado.", "error")
         return redirect(url_for("user.index"))
     return user_view.perfil(user)
+
+
+def _contar_admins():
+    return User.query.filter_by(role="admin").count()
 
 
 # ─────────────────────────── API AJAX (MODALES) ──────────────────────────────

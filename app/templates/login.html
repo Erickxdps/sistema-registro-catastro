@@ -21,6 +21,7 @@
             <md-elevation></md-elevation>
 
             <form method="post" id="loginForm" autocomplete="on">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <md-outlined-text-field
                         label="Nombre de usuario"
@@ -57,9 +58,7 @@
             </form>
 
             <div class="d-flex justify-content-center align-items-center gap-3 pt-3 mt-3 border-top small text-muted">
-                <a href="{{ url_for('user.create_user') }}" class="text-decoration-none">Crear cuenta</a>
-                <span>·</span>
-                <a href="{{ url_for('user.index') }}" class="text-decoration-none">Volver al inicio</a>
+                Las cuentas las crea un administrador del sistema.
             </div>
         </div>
 

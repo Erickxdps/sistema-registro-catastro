@@ -107,6 +107,7 @@
                             </a>
                             <form method="post" action="{{ url_for('asistencia.delete_asistencia', id=asistencia.id) }}"
                                   data-confirm="¿Eliminar el registro de asistencia de {{ asistencia.dueno.nombre if asistencia.dueno else 'este propietario' }}?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
                                     <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
                                 </button>

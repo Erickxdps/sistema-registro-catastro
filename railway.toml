@@ -2,9 +2,9 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python app/run.py"
-healthcheckPath = "/"
-healthcheckTimeout = 300
+startCommand = "gunicorn --chdir app run:app --bind 0.0.0.0:$PORT --workers 2 --preload --timeout 120"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 
 [[services]]

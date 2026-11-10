@@ -17,6 +17,7 @@ from models.reunion_model    import Reunion
 from models.multa_model      import Multa
 from views import asistencia_view
 from utils.decorators import role_required
+from utils.pagination import obtener_paginacion
 from database import db
 
 asistencia_bp = Blueprint("asistencia", __name__)
@@ -28,9 +29,7 @@ asistencia_bp = Blueprint("asistencia", __name__)
 @login_required
 def list_asistencias():
     """Lista paginada de asistencias con búsqueda y estadísticas globales."""
-    page     = request.args.get('page',     1,   type=int)
-    per_page = request.args.get('per_page', 20,  type=int)
-    search   = request.args.get('search',   '',  type=str)
+    page, per_page, search = obtener_paginacion(default_per_page=20)
 
     # Query base con JOINs necesarios para búsqueda y ordenamiento
     query = db.session.query(Asistencia).join(Duenio).join(Reunion)
@@ -48,7 +47,7 @@ def list_asistencias():
         )
 
     # Mostrar primero las asistencias de reuniones más recientes
-    asistencias_paginated = query.order_by(Reunion.fecha.desc()).paginate(
+    asistencias_paginated = query.order_by(Reunion.fecha.desc(), Asistencia.id).paginate(
         page=page, per_page=per_page, error_out=False
     )
 

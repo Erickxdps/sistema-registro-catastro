@@ -11,6 +11,7 @@
         <md-elevation></md-elevation>
 
         <form method="post" id="createAsistenciaForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">

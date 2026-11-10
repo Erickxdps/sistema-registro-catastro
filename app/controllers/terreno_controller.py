@@ -16,6 +16,7 @@ from models.terreno_model import Terreno
 from models.duenio_model  import Duenio
 from views import terreno_view
 from utils.decorators import role_required
+from utils.pagination import obtener_paginacion
 from database import db
 
 terreno_bp = Blueprint("terreno", __name__)
@@ -27,9 +28,7 @@ terreno_bp = Blueprint("terreno", __name__)
 @login_required
 def list_terrenos():
     """Lista paginada de terrenos con búsqueda por lugar, manzano o propietario."""
-    page     = request.args.get('page',     1,  type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    search   = request.args.get('search',   '', type=str)
+    page, per_page, search = obtener_paginacion(default_per_page=10)
 
     # JOIN con Duenio para permitir búsqueda por atributos del propietario
     query = db.session.query(Terreno).join(Duenio)
@@ -48,7 +47,7 @@ def list_terrenos():
             )
         )
 
-    terrenos_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+    terrenos_paginated = query.order_by(Terreno.id).paginate(page=page, per_page=per_page, error_out=False)
     return terreno_view.list_terrenos(terrenos_paginated, search)
 
 

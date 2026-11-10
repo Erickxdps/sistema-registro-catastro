@@ -3,7 +3,47 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {% if csrf_token is defined %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        // Protección CSRF para todo POST/PUT/DELETE emitido desde JavaScript:
+        // fetch() a este mismo origen lleva la cabecera X-CSRFToken, y cualquier
+        // <form method="post"> (incluidos los creados dinámicamente) recibe el
+        // campo oculto csrf_token antes de enviarse.
+        (function () {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            var token = meta ? meta.getAttribute('content') : '';
+            if (!token) return;
+
+            var fetchOriginal = window.fetch;
+            if (fetchOriginal) {
+                window.fetch = function (input, init) {
+                    init = init || {};
+                    var metodo = (init.method || (input && input.method) || 'GET').toUpperCase();
+                    if (metodo !== 'GET' && metodo !== 'HEAD') {
+                        var url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+                        if (url.origin === window.location.origin) {
+                            var headers = new Headers(init.headers || {});
+                            if (!headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+                            init.headers = headers;
+                        }
+                    }
+                    return fetchOriginal.call(this, input, init);
+                };
+            }
+
+            document.addEventListener('submit', function (e) {
+                var form = e.target;
+                if (!form || form.tagName !== 'FORM') return;
+                if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = token;
+                form.appendChild(input);
+            }, true);
+        })();
+    </script>
     <title>{% block title %}Junta de Vecinos Circuata{% endblock %}</title>
     <script>
         (function () {

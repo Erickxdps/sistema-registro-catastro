@@ -92,6 +92,7 @@
                             </a>
                             <form method="post" action="{{ url_for('terreno.delete_terreno', id=terreno.id) }}"
                                   data-confirm="¿Eliminar definitivamente el terreno {{ terreno.lugar }} - Manzano {{ terreno.manzano }}?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
                                     <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
                                 </button>
