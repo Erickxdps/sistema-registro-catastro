@@ -5,7 +5,7 @@ Aplicación web para administrar el padrón de una junta vecinal: propietarios, 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00)
-![Pruebas](https://img.shields.io/badge/pruebas-66%20pasan-2EA44F)
+![Pruebas](https://img.shields.io/badge/pruebas-102%20pasan-2EA44F)
 
 ## Contenido
 
@@ -235,7 +235,9 @@ Las pruebas nunca tocan `app/sistema.db`: cada una crea su propia base temporal 
 | Archivo | Qué comprueba |
 | --- | --- |
 | `tests/test_etapa1_seguridad.py` | Rutas protegidas, permisos por rol, límites de paginación, CSRF, secretos y configuración de producción |
-| `tests/test_humo.py` | Que todas las páginas cargan, que los formularios guardan, fechas de multas, claves foráneas y que la base original queda intacta |
+| `tests/test_humo.py` | Que todas las páginas cargan, que los formularios guardan, fechas de multas, claves foráneas y claves foráneas activas |
+| `tests/test_rediseno.py` | Paginación de 10 registros, filtros al cambiar de página, buscadores, permisos de búsqueda, reglas de cobro sin doble cobro, atomicidad y rendimiento con 3.000 propietarios |
+| `tests/test_inicio_cifras.py` | Cifras del inicio: sin montos para el público y valores reales con sesión |
 
 ## Despliegue en Railway
 
@@ -248,18 +250,19 @@ Por ahora el despliegue usa la base SQLite incluida en el repositorio. Railway r
 
 ## Estado del proyecto
 
-El sistema está en proceso de corrección tras una auditoría de 19 hallazgos.
+El sistema pasó la auditoría de 19 hallazgos y el rediseño del front-end.
 
 **Hecho y probado**
 
-- Seguridad: rutas protegidas, permisos, CSRF, secretos por variables de entorno y límites de paginación.
-- Producción: dependencias completas, Gunicorn, healthcheck propio y configuración lista para PostgreSQL (opcional).
-- Integridad: claves foráneas activas, fecha de las multas corregida y columna de contraseñas ampliada.
+- **Seguridad:** rutas protegidas, permisos por rol, CSRF, secretos por variables de entorno, límites de paginación y búsquedas que no exponen el CI completo.
+- **Reglas de negocio:** la cuota pendiente es la deuda y su multa es solo un reflejo, así que no hay doble cobro. Las operaciones de cuotas, pagos, reuniones y asistencias son atómicas.
+- **Errores corregidos:** edición de multas, cambio de propietario de terrenos y fechas inválidas en reuniones.
+- **Interfaz:** inicio público con cifras y plano de manzanos, paginación en todos los listados, buscadores con autocompletado, modo claro y oscuro, y diseño adaptado a móviles.
+- **Producción:** dependencias completas, Gunicorn y healthcheck en `/health`.
 
 **Pendiente**
 
-- Aplicar la regla del reflejo en los cálculos: el estado de cuenta y los reportes todavía suman la cuota y su multa.
-- Unificar los endpoints de cuotas y reuniones en transacciones únicas.
-- Errores conocidos: editar una multa falla porque falta su plantilla, y el formulario de terrenos no cambia el propietario.
-- Script de migración de SQLite a PostgreSQL.
-- Rediseño de la interfaz: paginación en todos los módulos, buscadores con autocompletado, modo oscuro y adaptación a móviles.
+- Script de migración de SQLite a PostgreSQL. Por ahora el sistema usa la base SQLite.
+- Revisión visual de las capturas del rediseño y comprobación del debounce del autocompletado.
+- Doce cuentas con un rol que no es administrador ni consulta. Siguen con su acceso actual hasta que un administrador las revise.
+- Cambio del nombre del repositorio en GitHub y de la carpeta local.
