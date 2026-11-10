@@ -8,4 +8,4 @@ healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 
 [[services]]
-name = "prueba-despliegue"
+name = "sistema-registro-catastro"

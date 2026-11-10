@@ -1,4 +1,4 @@
-# Junta de Vecinos Circuata — Sistema de gestión
+# Sistema de Registro y Catastro
 
 Aplicación web para administrar el padrón de una junta vecinal: propietarios, terrenos, reuniones, asistencias, cuotas y multas, con reportes exportables a Excel y estados de cuenta imprimibles.
 
@@ -109,7 +109,7 @@ Los nombres de rol vienen del código original. `doctor` equivale a "usuario de 
 ## Estructura del proyecto
 
 ```
-prueba-despliegue/
+sistema-registro-catastro/
 ├── app/
 │   ├── run.py              Fábrica de la app, configuración y comandos
 │   ├── database.py         Instancia de SQLAlchemy
