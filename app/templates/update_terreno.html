@@ -1,82 +1,20 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Editar terreno · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Editar terreno', terreno.lugar ~ ' · Mz. ' ~ terreno.manzano, 'fa-map-marked-alt') %}{% endcall %}
+{{ cabecera('Editar terreno', 'Lote ' ~ terreno.lugar ~ ', manzano ' ~ terreno.manzano, volver=url_for('terreno.list_terrenos'), volver_texto='Terrenos') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="updateTerrenoForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <label for="id_duenio" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">person_pin</span>
-                    Propietario asignado
-                </label>
-                <input type="text" class="form-control mb-2" data-filter-for="id_duenio" placeholder="Filtrar por nombre o CI..." autocomplete="off">
-                <select id="id_duenio" name="id_duenio" required class="form-select">
-                    {% for duenio in duenios %}
-                    <option value="{{ duenio.id }}" {% if duenio.id == terreno.duenio_id or duenio.id == getattr(terreno, 'id_dueno', None) %}selected{% endif %}>
-                        {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Lugar / Lote"
-                        id="lugar"
-                        name="lugar"
-                        value="{{ terreno.lugar }}"
-                        placeholder="Lote 15, Sector A"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">location_on</md-icon>
-                    </md-outlined-text-field>
-                </div>
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Manzano"
-                        id="manzano"
-                        name="manzano"
-                        type="number"
-                        min="1"
-                        value="{{ terreno.manzano }}"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">grid_view</md-icon>
-                    </md-outlined-text-field>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <md-outlined-text-field
-                    label="Superficie (m²)"
-                    id="metros_cuadrados"
-                    name="metros_cuadrados"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value="{{ terreno.metros_cuadrados }}"
-                    required>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">square_foot</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('terreno.list_terrenos') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Actualizar terreno
-                </md-filled-button>
-            </div>
-        </form>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        {% set v = terreno %}
+        {% set dueno = terreno.dueno %}
+        {% include '_form_terreno.html' %}
+        <p class="nota">
+            <span class="ico" aria-hidden="true">info</span>
+            <span>Si cambias el propietario, las cuotas pendientes de este lote pasan a su nombre.</span>
+        </p>
     </div>
-</div>
+    {{ pie_formulario(url_for('terreno.list_terrenos'), 'Guardar cambios') }}
+</form>
 {% endblock %}

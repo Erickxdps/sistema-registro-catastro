@@ -1,7 +1,5 @@
 # models/duenio_model.py
-# Modelo Duenio — refactorizado para centralizar relaciones ORM, añadir la
-# propiedad `es_immune` al modelo (eliminando el hardcode de IDs en controllers)
-# y estandarizar la nomenclatura de atributos de relación.
+# Modelo Duenio (propietario).
 #
 # IMPORTANTE: __tablename__, nombres de columnas y ForeignKeys no se modifican.
 
@@ -17,10 +15,8 @@ class Duenio(db.Model):
     materno = db.Column(db.String(50), nullable=True)
     ci      = db.Column(db.String(20), unique=True, nullable=False)
 
-    # ── Relaciones (se mantienen backref exactos para no romper templates) ──
-    # lazy='select' es equivalente a lazy=True pero explícito para legibilidad.
     # Las relaciones con backref desde Terreno y Asistencia agregan
-    # duenio.terrenos y duenio.asistencias automáticamente al registrarse.
+    # duenio.terrenos y duenio.asistencias automáticamente.
     multas = db.relationship('Multa', backref='duenio', lazy='select')
 
     def __init__(self, nombre, paterno, materno, ci):
@@ -29,28 +25,32 @@ class Duenio(db.Model):
         self.materno = materno
         self.ci      = ci
 
-    # ── Propiedad: inmunidad de entidad especial ──────────────────────────────
+    # ── Inmunidad: la propia junta figura como propietaria y no se multa ──────
     @property
     def es_immune(self):
-        """
-        Retorna True si este propietario tiene inmunidad contra multas.
-        La lógica de negocio vive en el modelo, no en los controllers,
-        y depende de atributos de datos (ci, nombre) en vez de IDs de BD.
-        """
         if self.ci == "555":
             return True
         nombre_upper  = (self.nombre  or "").upper()
         paterno_upper = (self.paterno or "").upper()
-        if nombre_upper == "JUNTA DE" and paterno_upper == "VECINOS":
-            return True
-        return False
+        return nombre_upper == "JUNTA DE" and paterno_upper == "VECINOS"
 
-    # ── Nombre completo (helper reutilizable) ─────────────────────────────────
     @property
     def nombre_completo(self):
-        """Devuelve el nombre completo concatenado y sin espacios extra."""
         partes = [self.nombre, self.paterno, self.materno]
-        return " ".join(p for p in partes if p).strip()
+        return " ".join(p.strip() for p in partes if p and p.strip())
+
+    @property
+    def iniciales(self):
+        return ((self.nombre or "?")[:1] + (self.paterno or "")[:1]).upper()
+
+    @property
+    def ci_enmascarado(self):
+        """CI parcialmente oculto (muestra los 3 últimos caracteres).
+        Sirve para distinguir homónimos sin publicar el documento completo."""
+        ci = (self.ci or "").strip()
+        if len(ci) <= 3:
+            return "•" * len(ci)
+        return "•" * (len(ci) - 3) + ci[-3:]
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
     def save(self):
@@ -59,7 +59,7 @@ class Duenio(db.Model):
 
     @staticmethod
     def get_all():
-        return Duenio.query.all()
+        return Duenio.query.order_by(Duenio.id).all()
 
     @staticmethod
     def get_by_id(id):
@@ -73,45 +73,70 @@ class Duenio(db.Model):
         db.session.commit()
 
     def delete(self):
-        """
-        Elimina el propietario y todos sus registros dependientes en cascada
-        manual, ya que SQLite no siempre respeta ON DELETE CASCADE sin
-        configuración extra de PRAGMA.
-        """
-        from models.terreno_model  import Terreno
-        from models.multa_model    import Multa
+        """Elimina el propietario y todo lo que depende de él en una sola
+        transacción: terrenos, cuotas (y sus reflejos), multas y asistencias."""
+        from models.terreno_model import Terreno
+        from models.multa_model import Multa
         from models.asistencia_model import Asistencia
-        from models.cuota_model    import Cuota
 
         try:
-            terrenos = Terreno.query.filter_by(duenio_id=self.id).all()
-
-            for terreno in terrenos:
-                cuotas = Cuota.query.filter_by(terreno_id=terreno.id).all()
-                for cuota in cuotas:
-                    # Eliminar multas asociadas a la cuota
-                    Multa.query.filter_by(cuota_id=cuota.cuota_id).delete()
-                    db.session.delete(cuota)
-
-                db.session.delete(terreno)
-
-            # Multas directas del propietario (tipo 'asistencia' u otras)
-            Multa.query.filter_by(duenio_id=self.id).delete()
-
-            # Asistencias del propietario
-            Asistencia.query.filter_by(duenio_id=self.id).delete()
-
+            for terreno in Terreno.query.filter_by(duenio_id=self.id).all():
+                terreno.eliminar()
+            Multa.query.filter_by(duenio_id=self.id).delete(synchronize_session=False)
+            Asistencia.query.filter_by(duenio_id=self.id).delete(synchronize_session=False)
+            db.session.flush()
+            db.session.expire(self)
             db.session.delete(self)
             db.session.commit()
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise
+
+    # ── Deuda ─────────────────────────────────────────────────────────────────
+    @staticmethod
+    def deudas_por_propietario(ids):
+        """Deuda real de cada propietario, en dos consultas agregadas:
+        cuotas pendientes de sus terrenos + multas que suman a la deuda.
+        Los reflejos de cuota NO se suman (ya están contados en la cuota).
+        Devuelve {duenio_id: {'cuotas': x, 'multas': y, 'total': x + y}}."""
+        from sqlalchemy import func
+        from models.terreno_model import Terreno
+        from models.multa_model import Multa
+        from models.cuota_model import Cuota
+
+        ids = list(ids)
+        resultado = {i: {"cuotas": 0.0, "multas": 0.0, "total": 0.0} for i in ids}
+        if not ids:
+            return resultado
+        filas = (db.session.query(Terreno.duenio_id, func.coalesce(func.sum(Cuota.monto), 0))
+                 .join(Cuota, Cuota.terreno_id == Terreno.id)
+                 .filter(Cuota.pagado.is_(False), Terreno.duenio_id.in_(ids))
+                 .group_by(Terreno.duenio_id).all())
+        for duenio_id, suma in filas:
+            resultado[duenio_id]["cuotas"] = float(suma or 0)
+        filas = (db.session.query(Multa.duenio_id, func.coalesce(func.sum(Multa.monto), 0))
+                 .filter(Multa.duenio_id.in_(ids), Multa.filtro_suma_a_deuda())
+                 .group_by(Multa.duenio_id).all())
+        for duenio_id, suma in filas:
+            resultado[duenio_id]["multas"] = float(suma or 0)
+        for datos in resultado.values():
+            datos["total"] = round(datos["cuotas"] + datos["multas"], 2)
+        return resultado
 
     @staticmethod
+    def terrenos_por_propietario(ids):
+        from sqlalchemy import func
+        from models.terreno_model import Terreno
+        ids = list(ids)
+        if not ids:
+            return {}
+        return dict(db.session.query(Terreno.duenio_id, func.count(Terreno.id))
+                    .filter(Terreno.duenio_id.in_(ids)).group_by(Terreno.duenio_id).all())
+
+    # ── Compatibilidad con código heredado ────────────────────────────────────
+    @staticmethod
     def get_user_by_username(username):
-        """Alias de compatibilidad — no aplicable a Duenio, se deja por si hay refs."""
         return None
 
     def has_role(self, role):
-        """Alias de compatibilidad con código heredado."""
         return False

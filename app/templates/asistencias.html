@@ -1,156 +1,99 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, initials, empty_state, pagination %}
-
-{% block title %}Asistencias · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar, persona %}
 
 {% block content %}
-{% call page_header('Asistencias', 'Participación de los propietarios en las asambleas', 'fa-clipboard-check') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('asistencia.create_asistencia') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">add_task</md-icon>
-            Registrar asistencia
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set es_admin = current_user.has_role('admin') %}
+{% set volver = request.full_path %}
+{% call cabecera('Asistencias', 'Quién asistió a cada reunión. Marcar a alguien como ausente aplica la multa de esa reunión.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('asistencia.create_asistencia', reunion_id=reunion.id if reunion else None) }}">{{ icono('person_check') }}Registrar asistencia</a>{% endif %}
 {% endcall %}
 
-{% if stats is defined and stats %}
-<div class="stats">
-    {{ stat('Total registros', stats.total_asistencias, 'fa-clipboard-list', 'info') }}
-    {{ stat('Presentes', stats.total_presentes, 'fa-user-check', 'success') }}
-    {{ stat('Ausentes', stats.total_ausentes, 'fa-user-times', 'danger') }}
-    {{ stat('Reuniones', stats.reuniones_unicas, 'fa-calendar-alt', 'brand') }}
-</div>
-{% elif asistencias %}
-{% set total_presentes = asistencias|selectattr('asistio', 'equalto', True)|list|length %}
-<div class="stats">
-    {{ stat('Registros', asistencias|length, 'fa-clipboard-list', 'info') }}
-    {{ stat('Presentes', total_presentes, 'fa-user-check', 'success') }}
-    {{ stat('Ausentes', asistencias|length - total_presentes, 'fa-user-times', 'danger') }}
-</div>
-{% endif %}
-
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <form method="GET" action="{{ url_for('asistencia.list_asistencias') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" class="form-control border-start-0" name="search" value="{{ search or '' }}" placeholder="Propietario, CI o tema de reunión...">
+<div class="hoja">
+    {% call filtros(conservar=('orden', 'per_page', 'reunion_id', 'estado')) %}
+        {{ buscador('buscar-asistencias', url_for('busqueda.buscar_propietarios'), 'Buscar propietario', valor=search,
+                    placeholder='Nombre, apellido o CI', etiqueta_visible=False) }}
+        <div class="filtros-fin">
+            <div class="campo">
+                <label for="filtro-estado" class="sr-only">Estado</label>
+                <select id="filtro-estado" name="estado" data-auto>
+                    <option value="">Todos</option>
+                    <option value="presente"{% if estado == 'presente' %} selected{% endif %}>Presentes</option>
+                    <option value="ausente"{% if estado == 'ausente' %} selected{% endif %}>Ausentes</option>
+                </select>
             </div>
-            <md-filled-button type="submit">Buscar</md-filled-button>
-            {% if search %}
-            <a href="{{ url_for('asistencia.list_asistencias') }}" class="text-decoration-none">
-                <md-outlined-button type="button">Limpiar</md-outlined-button>
-            </a>
-            {% endif %}
-        </form>
-        {% if asistencias_paginated and asistencias_paginated.total > 0 %}
-        <span class="text-muted small">
-            Página {{ asistencias_paginated.page }} de {{ asistencias_paginated.pages }} · {{ asistencias_paginated.total }} registros
-        </span>
-        {% endif %}
+        </div>
+    {% endcall %}
+
+    {% if reunion or search %}
+    <div class="filtros" style="padding-top: 10px; padding-bottom: 10px">
+        {% if reunion %}<a class="filtro-activo" href="{{ url_con(reunion_id=None, page=None) }}">Reunión del {{ reunion.fecha|fecha }}{% if reunion.descripcion %}: {{ reunion.descripcion }}{% endif %} {{ icono('close') }}<span class="sr-only">Ver todas las reuniones</span></a>{% endif %}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="resumen" aria-label="Resumen">
+        <div><span>Registros</span><strong class="num">{{ estadisticas.total_asistencias|entero }}</strong></div>
+        <div><span>Presentes</span><strong class="num">{{ estadisticas.total_presentes|entero }}</strong></div>
+        <div><span>Ausentes</span><strong class="num">{{ estadisticas.total_ausentes|entero }}</strong></div>
+        <div><span>Reuniones</span><strong class="num">{{ estadisticas.reuniones_unicas }}</strong></div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="asistenciasTable">
+    {% if asistencias_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">Propietario</th>
-                    <th>Reunión</th>
-                    <th>Fecha y hora</th>
-                    <th>Estado de asistencia</th>
-                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                    {{ th_orden('Propietario', 'propietario', orden) }}
+                    {{ th_orden('Reunión', 'fecha', orden) }}
+                    {{ th_orden('Estado', 'estado', orden) }}
+                    {% if es_admin %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% for asistencia in asistencias %}
+            {% for a in asistencias_paginated.items %}
                 <tr>
-                    <td class="ps-3">
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(asistencia.dueno.nombre, asistencia.dueno.paterno) if asistencia.dueno else '?' }}
-                            </div>
-                            <div>
-                                <div class="person-name fw-medium">
-                                    {% if asistencia.dueno %}
-                                    {{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno or '' }} {{ asistencia.dueno.materno or '' }}
-                                    {% else %}
-                                    <span class="text-danger">Propietario no encontrado</span>
-                                    {% endif %}
-                                </div>
-                                <div class="person-meta small text-muted">CI: {{ asistencia.dueno.ci if asistencia.dueno else '—' }}</div>
-                            </div>
-                        </div>
+                    <td class="celda-titulo">{{ persona(a.dueno, None, 'CI ' ~ a.dueno.ci if a.dueno else '') }}</td>
+                    <td data-label="Reunión">
+                        <span class="num">{{ a.reunion.fecha|fecha }}</span>
+                        <span class="celda-secundaria">{{ a.reunion.descripcion or 'Sin tema' }}</span>
                     </td>
-                    <td>
-                        <div class="fw-semibold">{{ asistencia.reunion.descripcion if asistencia.reunion else 'Reunión #' ~ asistencia.id_reunion }}</div>
+                    <td data-label="Estado">
+                        {% if a.asistio %}<span class="estado estado-ok">Presente</span>
+                        {% elif a.dueno and a.dueno.es_immune %}<span class="estado estado-neutro">Ausente, exento</span>
+                        {% else %}<span class="estado estado-deuda">Ausente{% if a.reunion.monto_multa %}, multa Bs {{ a.reunion.monto_multa|bs }}{% endif %}</span>{% endif %}
                     </td>
-                    <td>
-                        <div class="num small">{{ asistencia.reunion.fecha.strftime('%d/%m/%Y') if (asistencia.reunion and asistencia.reunion.fecha) else 'Sin fecha' }}</div>
-                        <div class="text-muted small"><i class="fas fa-clock me-1"></i>{{ asistencia.reunion.hora.strftime('%H:%M') if (asistencia.reunion and asistencia.reunion.hora) else '' }}</div>
-                    </td>
-                    <td>
-                        {% if asistencia.asistio %}
-                        <span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Presente</span>
-                        {% else %}
-                        <span class="chip tone-danger"><i class="fas fa-times-circle me-1"></i>Ausente (Multado)</span>
-                        {% endif %}
-                    </td>
-                    {% if current_user.has_role('admin') %}
-                    <td class="pe-3">
-                        <div class="row-actions justify-content-end gap-1">
-                            <a href="{{ url_for('asistencia.update_asistencia', id=asistencia.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar asistencia">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-                            </a>
-                            <form method="post" action="{{ url_for('asistencia.delete_asistencia', id=asistencia.id) }}"
-                                  data-confirm="¿Eliminar el registro de asistencia de {{ asistencia.dueno.nombre if asistencia.dueno else 'este propietario' }}?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
-                                </button>
-                            </form>
-                        </div>
+                    {% if es_admin %}
+                    <td class="acciones">
+                        <form method="post" action="{{ url_for('asistencia.marcar_asistencia') }}" style="display: inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="duenio_id" value="{{ a.duenio_id }}">
+                            <input type="hidden" name="id_reunion" value="{{ a.id_reunion }}">
+                            <input type="hidden" name="volver" value="{{ volver }}">
+                            <input type="hidden" name="asistio" value="{{ 'false' if a.asistio else 'true' }}">
+                            <button type="submit" class="boton boton-chico">
+                                {{ icono('close' if a.asistio else 'check') }}{{ 'Marcar ausente' if a.asistio else 'Marcar presente' }}
+                            </button>
+                        </form>
+                        {% call menu_acciones('Más acciones') %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('asistencia.update_asistencia', id=a.id) }}">{{ icono('edit') }}Editar</a>
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('asistencia.delete_asistencia', id=a.id),
+                                           'Se quitará a ' ~ (a.dueno.nombre_completo if a.dueno else 'este propietario') ~ ' de la lista de esta reunión y se eliminará su multa por inasistencia.',
+                                           texto='Quitar de la lista', titulo='¿Quitar este registro?', volver=volver) }}
+                        {% endcall %}
                     </td>
                     {% endif %}
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5">
-                        {% if search %}
-                            {% call empty_state('fa-search', 'Sin resultados', 'No hay asistencias que coincidan con "' ~ search ~ '"') %}
-                                <a href="{{ url_for('asistencia.list_asistencias') }}" class="btn btn-light btn-sm">Ver todas</a>
-                            {% endcall %}
-                        {% else %}
-                            {% call empty_state('fa-clipboard-check', 'No hay asistencias', 'Crea una reunión para generar las asistencias automáticamente.') %}
-                                {% if current_user.has_role('admin') %}
-                                <a href="{{ url_for('reunion.create_reunion') }}" class="btn btn-primary btn-sm">Programar reunión</a>
-                                {% endif %}
-                            {% endcall %}
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
-
-    {% if asistencias_paginated and asistencias_paginated.pages > 1 %}
-    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
-        <form method="GET" action="{{ url_for('asistencia.list_asistencias') }}" class="d-flex align-items-center gap-2">
-            <input type="hidden" name="search" value="{{ search or '' }}">
-            <span class="small text-muted">Mostrar</span>
-            <select name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
-                {% for n in [10, 20, 50, 100] %}
-                <option value="{{ n }}" {% if request.args.get('per_page', '20') == n|string %}selected{% endif %}>{{ n }}</option>
-                {% endfor %}
-            </select>
-            <span class="small text-muted">por página</span>
-        </form>
-        {{ pagination(asistencias_paginated, 'asistencia.list_asistencias', search=search) }}
-    </div>
+    {{ paginacion(asistencias_paginated, 'registros') }}
+    {% elif search or estado or reunion %}
+    {{ vacio('Ningún registro coincide con el filtro', 'Cambia la búsqueda o el estado seleccionado.', url_for('asistencia.list_asistencias'), 'Ver todos los registros', 'list') }}
+    {% else %}
+    {{ vacio('Todavía no hay asistencias', 'La lista se crea sola al convocar una reunión.',
+             url_for('reunion.create_reunion') if es_admin else None, 'Convocar reunión', 'event') }}
     {% endif %}
 </div>
 {% endblock %}

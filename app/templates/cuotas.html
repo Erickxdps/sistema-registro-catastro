@@ -1,351 +1,149 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, initials, empty_state %}
-
-{% block title %}Cuotas · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar, persona %}
 
 {% block content %}
-{% call page_header('Cuotas', 'Aportes por propietario y su estado de pago', 'fa-receipt') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('cuota.create_cuota') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">add_circle</md-icon>
-            Nueva cuota
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set es_admin = current_user.has_role('admin') %}
+{% call cabecera('Cuotas', 'Aportes emitidos a todos los terrenos y el registro de sus pagos.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('cuota.create_cuota') }}">{{ icono('add_card') }}Emitir cuota</a>{% endif %}
 {% endcall %}
 
-{# Agrupación eficiente O(N) por propietario y por tipo #}
-{% set grupos = {} %}
-{% set tipos = {} %}
-{% for c in cuotas if c.terreno and c.terreno.dueno %}
-    {% set did = c.terreno.dueno.id %}
-    {% if did not in grupos %}
-        {% set _ = grupos.update({did: {'dueno': c.terreno.dueno, 'cuotas': []}}) %}
-    {% endif %}
-    {% set _ = grupos[did]['cuotas'].append(c) %}
-
-    {% if c.titulo not in tipos %}
-        {% set _ = tipos.update({c.titulo: {'cuotas': [], 'duenos': []}}) %}
-    {% endif %}
-    {% set _ = tipos[c.titulo]['cuotas'].append(c) %}
-    {% if did not in tipos[c.titulo]['duenos'] %}
-        {% set _ = tipos[c.titulo]['duenos'].append(did) %}
-    {% endif %}
-{% endfor %}
-
-{% if cuotas %}
-{% set pagadas = cuotas|selectattr('pagado', 'equalto', true)|list|length %}
-{% set pendientes = cuotas|selectattr('pagado', 'equalto', false)|list|length %}
-<div class="stats">
-    {{ stat('Propietarios con cuotas', grupos|length, 'fa-users', 'brand') }}
-    {{ stat('Cuotas registradas', cuotas|length, 'fa-receipt', 'info') }}
-    {{ stat('Pagadas', pagadas, 'fa-check-circle', 'success') }}
-    {{ stat('Pendientes', pendientes, 'fa-clock', 'warning') }}
-    {{ stat('Monto total', 'Bs. ' ~ '{:,.2f}'.format(cuotas|sum(attribute='monto')), 'fa-money-bill-wave', 'neutral') }}
-</div>
-{% endif %}
-
-{% if current_user.has_role('admin') and tipos %}
-<div class="md3-card table-card p-0 mb-4" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-        <span class="fw-bold">Cuotas agrupadas por tipo</span>
-        <span class="text-muted small">Eliminar un tipo borra sus cuotas de todos los terrenos</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-            <thead>
-                <tr>
-                    <th class="ps-3">Tipo de cuota</th>
-                    <th>Total cuotas</th>
-                    <th>Propietarios</th>
-                    <th>Total recaudable</th>
-                    <th class="text-end pe-3">Acción masiva</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for titulo, t in tipos.items() %}
-                <tr>
-                    <td class="fw-semibold ps-3">{{ titulo }}</td>
-                    <td class="num">{{ t.cuotas|length }}</td>
-                    <td class="num">{{ t.duenos|length }}</td>
-                    <td class="num fw-medium">Bs. {{ '{:,.2f}'.format(t.cuotas|sum(attribute='monto')) }}</td>
-                    <td class="text-end pe-3">
-                        <button type="button" class="btn btn-outline-danger btn-sm btn-eliminar-tipo"
-                                data-titulo="{{ titulo }}" data-total="{{ t.cuotas|length }}" data-duenos="{{ t.duenos|length }}">
-                            <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
-                            Eliminar tipo
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
-
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="input-group" style="max-width: 380px;">
-            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Filtrar por nombre, CI o lote...">
+<div class="hoja">
+    <div class="hoja-cabeza">
+        <div>
+            <h2>Emisiones</h2>
+            <p>Cada emisión crea una cuota por terreno. Elige una para ver su detalle.</p>
         </div>
-        <span class="text-muted small" id="conteoFilas"></span>
     </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="dueniosCuotasTable">
-            <thead>
-                <tr>
-                    <th class="ps-3">Propietario</th>
-                    <th>Estado de cuotas</th>
-                    <th>Terrenos</th>
-                    <th class="text-end pe-3">Detalle</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for did, g in grupos.items() %}
-                {% set dueno = g.dueno %}
-                {% set lista = g.cuotas %}
-                {% set n_pagadas = lista|selectattr('pagado', 'equalto', true)|list|length %}
-                {% set n_pendientes = lista|selectattr('pagado', 'equalto', false)|list|length %}
-                {% set nombre_completo = dueno.nombre ~ ' ' ~ (dueno.paterno or '') ~ ' ' ~ (dueno.materno or '') %}
-
-                {% set detalle = [] %}
-                {% for c in lista %}
-                    {% set _ = detalle.append({
-                        'id': c.cuota_id,
-                        'titulo': c.titulo,
-                        'descripcion': c.descripcion or '',
-                        'monto': c.monto|float,
-                        'pagado': c.pagado,
-                        'fecha': c.fecha_creacion.strftime('%d/%m/%Y') if c.fecha_creacion else 'N/A',
-                        'terreno': (c.terreno.lugar ~ ' · Mz. ' ~ c.terreno.manzano) if c.terreno else 'N/A'
-                    }) %}
-                {% endfor %}
-
-                <tr class="fila-dueno">
-                    <td class="ps-3">
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(dueno.nombre, dueno.paterno) }}
-                            </div>
-                            <div>
-                                <div class="person-name fw-medium">{{ nombre_completo }}</div>
-                                <div class="person-meta small text-muted">CI: {{ dueno.ci or 'Sin CI' }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="d-flex flex-wrap gap-1 mb-1">
-                            {% if n_pagadas %}<span class="chip tone-success"><i class="fas fa-check me-1"></i>{{ n_pagadas }} pagada{{ 's' if n_pagadas != 1 }}</span>{% endif %}
-                            {% if n_pendientes %}<span class="chip tone-warning"><i class="fas fa-clock me-1"></i>{{ n_pendientes }} pendiente{{ 's' if n_pendientes != 1 }}</span>{% endif %}
-                        </div>
-                        <span class="fw-semibold num">Bs. {{ '{:,.2f}'.format(lista|sum(attribute='monto')) }}</span>
-                        <span class="text-muted small">· {{ lista|length }} en total</span>
-                    </td>
-                    <td>
-                        <div class="d-flex flex-wrap gap-1">
-                            {% for terreno in dueno.terrenos %}
-                            <span class="chip"><i class="fas fa-map-marker-alt me-1"></i>{{ terreno.lugar }} · Mz. {{ terreno.manzano }}</span>
-                            {% else %}
-                            <span class="text-muted small">Sin terrenos</span>
-                            {% endfor %}
-                        </div>
-                    </td>
-                    <td class="text-end pe-3">
-                        <button class="btn btn-outline-primary btn-sm btn-ver-cuotas"
-                                data-dueno="{{ dueno.id }}"
-                                data-nombre="{{ nombre_completo }}"
-                                data-ci="{{ dueno.ci or 'Sin CI' }}"
-                                data-cuotas='{{ detalle|tojson }}'>
-                            <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-                            Ver cuotas
-                        </button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4">{{ empty_state('fa-receipt', 'Sin cuotas', 'No hay cuotas registradas en el sistema.') }}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Detalle de cuotas de un propietario -->
-<div class="modal fade" id="verCuotasModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="me-auto">
-                    <h5 class="modal-title fw-bold">Historial de cuotas</h5>
-                    <div class="text-muted small" id="nombreDuenoCuotas"></div>
+    {% if emisiones %}
+    <div class="emisiones">
+        {% for e in emisiones %}
+        <div class="emision{{ ' activa' if titulo == e.titulo else '' }}">
+            <div>
+                <a class="celda-principal" href="{{ url_con(titulo=e.titulo, page=None) }}">{{ e.titulo }}</a>
+                <span class="celda-secundaria">
+                    Emitida el {{ e.fecha|fecha }}, Bs {{ e.monto_min|bs }}{% if e.monto_max != e.monto_min %} a {{ e.monto_max|bs }}{% endif %} por terreno,
+                    {{ e.propietarios|entero }} propietarios
+                </span>
+            </div>
+            <div>
+                <div class="barra-progreso" style="margin: 0 0 6px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ e.porcentaje }}" aria-label="Avance de cobro">
+                    <span style="width: {{ e.porcentaje }}%"></span>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                <span class="celda-secundaria num">{{ e.pagadas|entero }} de {{ e.total|entero }} pagadas ({{ e.porcentaje }} %). Bs {{ e.monto_pagado|bs }} de {{ e.monto_total|bs }}</span>
             </div>
-            <div class="modal-body p-0" id="contenidoCuotas"></div>
-            <div class="modal-footer justify-content-between" id="resumenCuotas"></div>
+            <div class="acciones">
+                {% call menu_acciones('Acciones para ' ~ e.titulo) %}
+                    <a class="menu-item" role="menuitem" href="{{ url_con(titulo=e.titulo, estado='pendiente', page=None) }}">{{ icono('pending_actions') }}Ver pendientes</a>
+                    <a class="menu-item" role="menuitem" href="{{ url_con(titulo=e.titulo, estado='pagada', page=None) }}">{{ icono('task_alt') }}Ver pagadas</a>
+                    {% if es_admin %}
+                    <div class="menu-separador"></div>
+                    <button type="button" class="menu-item peligro" role="menuitem"
+                            data-fetch="{{ url_for('cuota.delete_cuotas_by_title_ajax') }}"
+                            data-fetch-cuerpo='{{ {"titulo": e.titulo}|tojson }}'
+                            data-destino="{{ url_for('cuota.list_cuotas') }}"
+                            data-confirm-titulo="¿Eliminar toda la emisión?"
+                            data-confirm="Se eliminarán las {{ e.total|entero }} cuotas de “{{ e.titulo }}”, incluidas las {{ e.pagadas|entero }} ya pagadas. No se puede deshacer."
+                            data-confirm-accion="Eliminar emisión">{{ icono('delete') }}Eliminar emisión</button>
+                    {% endif %}
+                {% endcall %}
+            </div>
         </div>
+        {% endfor %}
     </div>
+    {% else %}
+    {{ vacio('Todavía no se emitió ninguna cuota', 'Al emitir una cuota se crea una por cada terreno registrado.',
+             url_for('cuota.create_cuota') if es_admin else None, 'Emitir cuota', 'add_card') }}
+    {% endif %}
 </div>
 
-<!-- Progreso de eliminación por tipo -->
-<div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center p-4">
-                <div class="spinner-border text-danger mb-3" role="status"></div>
-                <h6 class="mb-1 fw-bold">Eliminando cuotas</h6>
-                <div class="text-muted small mb-3" id="progressTitulo"></div>
-                <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated bg-danger" style="width:100%"></div></div>
-                <div class="text-muted small mt-3">Procesando eliminación masiva. Espera un momento...</div>
-            </div>
+{% if emisiones %}
+<div class="hoja" style="margin-top: 28px">
+    <div class="hoja-cabeza">
+        <div>
+            <h2>Detalle de cuotas</h2>
+            <p>Busca por lote, manzano o propietario. Registrar un pago actualiza su multa al momento.</p>
         </div>
     </div>
+    {% call filtros(conservar=('orden', 'per_page')) %}
+        {{ buscador('buscar-cuotas', url_for('busqueda.buscar_terrenos'), 'Buscar cuota', valor=search,
+                    placeholder='Lote, manzano o propietario', etiqueta_visible=False) }}
+        <div class="filtros-fin">
+            <div class="campo">
+                <label for="filtro-titulo" class="sr-only">Emisión</label>
+                <select id="filtro-titulo" name="titulo" data-auto>
+                    <option value="">Todas las emisiones</option>
+                    {% for e in emisiones %}<option value="{{ e.titulo }}"{% if titulo == e.titulo %} selected{% endif %}>{{ e.titulo }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="campo">
+                <label for="filtro-estado" class="sr-only">Estado</label>
+                <select id="filtro-estado" name="estado" data-auto>
+                    <option value="">Todas</option>
+                    <option value="pendiente"{% if estado == 'pendiente' %} selected{% endif %}>Pendientes</option>
+                    <option value="pagada"{% if estado == 'pagada' %} selected{% endif %}>Pagadas</option>
+                </select>
+            </div>
+        </div>
+    {% endcall %}
+
+    {% if cuotas_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
+            <thead>
+                <tr>
+                    {{ th_orden('Terreno', 'terreno', orden) }}
+                    {{ th_orden('Propietario', 'propietario', orden) }}
+                    <th>Emisión</th>
+                    {{ th_orden('Monto', 'monto', orden, 'derecha') }}
+                    {{ th_orden('Estado', 'estado', orden) }}
+                    {% if es_admin %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in cuotas_paginated.items %}
+                <tr>
+                    <td class="celda-titulo">
+                        <span class="celda-principal">Lote {{ c.terreno.lugar }}</span>
+                        <span class="celda-secundaria">Manzano {{ c.terreno.manzano }}</span>
+                    </td>
+                    <td data-label="Propietario">{{ persona(c.terreno.dueno) }}</td>
+                    <td data-label="Emisión">{{ c.titulo }}<span class="celda-secundaria">{{ c.fecha_creacion|fecha }}</span></td>
+                    <td data-label="Monto" class="derecha num">Bs {{ c.monto|bs }}</td>
+                    <td data-label="Estado">
+                        {% if c.pagado %}<span class="estado estado-ok">Pagada</span>
+                        {% else %}<span class="estado estado-pend">Pendiente</span>{% endif %}
+                    </td>
+                    {% if es_admin %}
+                    <td class="acciones">
+                        <button type="button" class="boton boton-chico"
+                                data-fetch="{{ url_for('cuota.toggle_payment', cuota_id=c.cuota_id) }}"
+                                {% if c.pagado %}
+                                data-confirm-titulo="¿Anular el pago?"
+                                data-confirm="La cuota del lote {{ c.terreno.lugar }} volverá a quedar pendiente."
+                                data-confirm-accion="Anular pago"
+                                {% endif %}
+                                data-exito="{{ 'Pago anulado: la cuota quedó pendiente.' if c.pagado else 'Pago registrado.' }}">
+                            {{ icono('undo' if c.pagado else 'payments') }}{{ 'Anular pago' if c.pagado else 'Registrar pago' }}
+                        </button>
+                        {% call menu_acciones('Más acciones') %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('cuota.update_cuota', cuota_id=c.cuota_id) }}">{{ icono('edit') }}Editar cuota</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('reporte.estado_cuenta_imprimible', duenio_id=c.terreno.duenio_id) }}">{{ icono('request_quote') }}Estado de cuenta</a>
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('cuota.delete_cuota', cuota_id=c.cuota_id),
+                                           'Se eliminará esta cuota del lote ' ~ c.terreno.lugar ~ '. No se puede deshacer.',
+                                           titulo='¿Eliminar esta cuota?') }}
+                        {% endcall %}
+                    </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ paginacion(cuotas_paginated, 'cuotas') }}
+    {% else %}
+    {{ vacio('Ninguna cuota coincide con el filtro', 'Cambia la búsqueda, la emisión o el estado.', url_for('cuota.list_cuotas'), 'Ver todas las cuotas', 'list') }}
+    {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    (function () {
-        var modalEl = document.getElementById('verCuotasModal');
-        var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
-        var duenoActualId = null;
-
-        function esc(v) {
-            var d = document.createElement('div');
-            d.textContent = v == null ? '' : String(v);
-            return d.innerHTML;
-        }
-
-        function renderModal(nombre, ci, cuotas) {
-            document.getElementById('nombreDuenoCuotas').textContent = nombre + ' · CI ' + ci;
-            var body = document.getElementById('contenidoCuotas');
-            var foot = document.getElementById('resumenCuotas');
-
-            if (!cuotas.length) {
-                body.innerHTML = '<div class="empty p-4 text-center"><i class="fas fa-receipt fa-2x mb-2 text-muted"></i><h6>Sin cuotas</h6></div>';
-                foot.innerHTML = '';
-                return;
-            }
-
-            var total = 0, pagadas = 0, pendientes = 0;
-            var filas = cuotas.map(function (c) {
-                total += c.monto;
-                if (c.pagado) pagadas += c.monto; else pendientes += c.monto;
-
-                var chip = c.pagado
-                    ? '<span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Pagada</span>'
-                    : '<span class="chip tone-warning"><i class="fas fa-clock me-1"></i>Pendiente</span>';
-
-                var toggleBtn = '<button class="btn btn-sm ' + (c.pagado ? 'btn-outline-warning' : 'btn-outline-success') + ' btn-toggle-cuota" data-id="' + c.id + '">' +
-                    '<i class="fas ' + (c.pagado ? 'fa-undo' : 'fa-check') + ' me-1"></i>' + (c.pagado ? 'Marcar pendiente' : 'Marcar pagada') +
-                    '</button>';
-
-                return '<tr>' +
-                    '<td class="ps-3"><div class="fw-semibold">' + esc(c.titulo) + '</div><div class="small text-muted">' + (c.descripcion ? esc(c.descripcion) : '') + '</div></td>' +
-                    '<td><span class="chip">' + esc(c.terreno) + '</span></td>' +
-                    '<td class="num fw-bold">Bs. ' + c.monto.toFixed(2) + '</td>' +
-                    '<td>' + chip + '</td>' +
-                    '<td class="num small text-muted">' + esc(c.fecha) + '</td>' +
-                    '<td class="text-end pe-3">' + toggleBtn + '</td>' +
-                    '</tr>';
-            }).join('');
-
-            body.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
-                '<thead><tr><th class="ps-3">Cuota</th><th>Terreno</th><th>Monto</th><th>Estado</th><th>Fecha</th><th class="text-end pe-3">Acción</th></tr></thead>' +
-                '<tbody>' + filas + '</tbody></table></div>';
-
-            foot.innerHTML = '<div class="d-flex flex-wrap gap-3 small">' +
-                '<span>Total: <strong class="num">Bs. ' + total.toFixed(2) + '</strong></span>' +
-                '<span>Pagado: <strong class="num text-success">Bs. ' + pagadas.toFixed(2) + '</strong></span>' +
-                '<span>Pendiente: <strong class="num text-danger">Bs. ' + pendientes.toFixed(2) + '</strong></span>' +
-                '</div>';
-
-            // Toggle de estado por cuota
-            body.querySelectorAll('.btn-toggle-cuota').forEach(function (btn) {
-                btn.addEventListener('click', async function () {
-                    var cid = this.getAttribute('data-id');
-                    this.disabled = true;
-                    try {
-                        var res = await fetch('/cuotas/' + cid + '/toggle-payment', { method: 'POST' });
-                        var data = await res.json();
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            alert(data.message || 'Error al cambiar estado');
-                            this.disabled = false;
-                        }
-                    } catch (e) {
-                        alert('Error de conexión: ' + e.message);
-                        this.disabled = false;
-                    }
-                });
-            });
-        }
-
-        document.querySelectorAll('.btn-ver-cuotas').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                duenoActualId = this.getAttribute('data-dueno');
-                var nombre = this.getAttribute('data-nombre');
-                var ci = this.getAttribute('data-ci');
-                var cuotas = JSON.parse(this.getAttribute('data-cuotas') || '[]');
-                renderModal(nombre, ci, cuotas);
-                if (modal) modal.show();
-            });
-        });
-
-        // Eliminación masiva por tipo
-        document.querySelectorAll('.btn-eliminar-tipo').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                var titulo = this.getAttribute('data-titulo');
-                var total = this.getAttribute('data-total');
-                if (!confirm('¿Eliminar todas las ' + total + ' cuotas del tipo "' + titulo + '"? Esta acción no se puede deshacer.')) return;
-
-                var progress = new bootstrap.Modal(document.getElementById('progressModal'));
-                document.getElementById('progressTitulo').textContent = titulo;
-                progress.show();
-
-                try {
-                    var res = await fetch('/api/cuotas/delete-by-title', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ titulo: titulo })
-                    });
-                    var data = await res.json();
-                    progress.hide();
-
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert('Error: ' + (data.error || 'No se pudo eliminar'));
-                    }
-                } catch (e) {
-                    progress.hide();
-                    alert('Error de conexión: ' + e.message);
-                }
-            });
-        });
-
-        // Filtro de tabla
-        var filtro = document.getElementById('filtroTabla');
-        var filas = document.querySelectorAll('.fila-dueno');
-        var conteo = document.getElementById('conteoFilas');
-        if (filtro) {
-            filtro.addEventListener('input', function () {
-                var q = (this.value || '').trim().toLowerCase(), n = 0;
-                filas.forEach(function (f) {
-                    var ok = f.textContent.toLowerCase().indexOf(q) > -1;
-                    f.style.display = ok ? '' : 'none';
-                    if (ok) n++;
-                });
-                if (conteo) conteo.textContent = n + ' propietario' + (n !== 1 ? 's' : '');
-            });
-        }
-    })();
-</script>
+{% endif %}
 {% endblock %}

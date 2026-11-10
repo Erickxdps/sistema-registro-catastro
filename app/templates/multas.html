@@ -1,222 +1,89 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, initials, empty_state %}
-
-{% block title %}Multas · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar, persona %}
 
 {% block content %}
-{% call page_header('Multas', 'Resumen por propietario y detalle de cada sanción', 'fa-gavel') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('multa.create_multa') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">add_circle</md-icon>
-            Nueva multa
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set es_admin = current_user.has_role('admin') %}
+{% call cabecera('Multas', 'Sanciones por inasistencia y multas manuales. Las cuotas impagas aparecen aparte porque ya cuentan como deuda.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('multa.create_multa') }}">{{ icono('add') }}Registrar multa</a>{% endif %}
 {% endcall %}
 
-{# Agrupación eficiente O(N) por propietario en un solo paso #}
-{% set grupos = {} %}
-{% for m in multas if m.duenio %}
-    {% set did = m.duenio.id %}
-    {% if did not in grupos %}
-        {% set _ = grupos.update({did: {'duenio': m.duenio, 'multas': []}}) %}
-    {% endif %}
-    {% set _ = grupos[did]['multas'].append(m) %}
-{% endfor %}
-
-{% if multas %}
-{% set total_monto = multas|sum(attribute='monto') %}
-<div class="stats">
-    {{ stat('Propietarios sancionados', grupos|length, 'fa-users', 'brand') }}
-    {{ stat('Multas registradas', multas|length, 'fa-gavel', 'danger') }}
-    {{ stat('Monto acumulado', 'Bs. ' ~ '%.2f'|format(total_monto), 'fa-money-bill-wave', 'success') }}
-</div>
-{% endif %}
-
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="input-group" style="max-width: 380px;">
-            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Buscar por propietario o CI...">
-        </div>
-        <span class="text-muted small" id="conteoFilas"></span>
+<div class="hoja">
+    <div class="resumen" aria-label="Resumen">
+        <div><span>Multas que suman a la deuda</span><strong class="num">Bs {{ resumen.monto_reales|bs }}</strong></div>
+        <div><span>Cantidad</span><strong class="num">{{ resumen.reales|entero }}</strong></div>
+        <div><span>Propietarios sancionados</span><strong class="num">{{ resumen.sancionados|entero }}</strong></div>
+        <div><span>Por cuotas impagas (no se suman)</span><strong class="num tenue">Bs {{ resumen.monto_reflejos|bs }}</strong></div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="dueniosMultasTable">
+    {% call filtros(conservar=('orden', 'per_page')) %}
+        {{ buscador('buscar-multas', url_for('busqueda.buscar_propietarios'), 'Buscar por propietario', valor=search,
+                    placeholder='Nombre, apellido o CI', etiqueta_visible=False) }}
+        <div class="filtros-fin">
+            <div class="campo">
+                <label for="filtro-tipo" class="sr-only">Tipo</label>
+                <select id="filtro-tipo" name="tipo" data-auto>
+                    <option value="">Todos los tipos</option>
+                    <option value="asistencia"{% if tipo == 'asistencia' %} selected{% endif %}>Inasistencia</option>
+                    <option value="manual"{% if tipo == 'manual' %} selected{% endif %}>Manuales</option>
+                    <option value="cuota"{% if tipo == 'cuota' %} selected{% endif %}>Por cuota impaga</option>
+                </select>
+            </div>
+        </div>
+    {% endcall %}
+
+    {% if multas_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">Propietario</th>
-                    <th>Multas y monto</th>
-                    <th>Terrenos</th>
-                    <th class="text-end pe-3">Detalle</th>
+                    {{ th_orden('Propietario', 'propietario', orden) }}
+                    <th>Motivo</th>
+                    {{ th_orden('Fecha', 'fecha', orden) }}
+                    {{ th_orden('Monto', 'monto', orden, 'derecha') }}
+                    <th class="acciones"><span class="sr-only">Acciones</span></th>
                 </tr>
             </thead>
             <tbody>
-                {% for did, g in grupos.items() %}
-                {% set dueno = g.duenio %}
-                {% set multas_dueno = g.multas %}
-                {% set suma_dueno = multas_dueno|sum(attribute='monto') %}
-                {% set inasistencias = multas_dueno|selectattr('tipo', 'equalto', 'asistencia')|list|length %}
-                {% set cuotas_m = multas_dueno|selectattr('tipo', 'equalto', 'cuota')|list|length %}
-                {% set otras = multas_dueno|length - inasistencias - cuotas_m %}
-
-                {% set detalle = [] %}
-                {% for m in multas_dueno %}
-                    {% set _ = detalle.append({
-                        'id': m.multa_id,
-                        'tipo': m.tipo,
-                        'descripcion': m.descripcion or '',
-                        'monto': m.monto|float,
-                        'fecha': m.fecha.strftime('%d/%m/%Y') if m.fecha else ''
-                    }) %}
-                {% endfor %}
-
-                <tr class="fila-dueno">
-                    <td class="ps-3">
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(dueno.nombre, dueno.paterno) }}
-                            </div>
-                            <div>
-                                <div class="person-name fw-medium">{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}</div>
-                                <div class="person-meta small text-muted">CI: {{ dueno.ci or 'Sin CI' }}</div>
-                            </div>
-                        </div>
+            {% for m in multas_paginated.items %}
+                <tr>
+                    <td class="celda-titulo">{{ persona(m.duenio, url_for('multa.multas_por_duenio', duenio_id=m.duenio_id)) }}</td>
+                    <td data-label="Motivo">
+                        {% if m.es_reflejo_cuota %}<span class="etiqueta etiqueta-pend">Cuota impaga</span>
+                        {% elif m.tipo == 'asistencia' %}<span class="etiqueta etiqueta-deuda">Inasistencia</span>
+                        {% else %}<span class="etiqueta">Manual</span>{% endif %}
+                        <span class="celda-secundaria">{{ m.descripcion or 'Sin detalle' }}</span>
                     </td>
-                    <td>
-                        <div class="d-flex flex-wrap gap-1 mb-1">
-                            {% if inasistencias %}<span class="chip tone-warning"><i class="fas fa-user-times me-1"></i>{{ inasistencias }} inasistencia{{ 's' if inasistencias != 1 }}</span>{% endif %}
-                            {% if cuotas_m %}<span class="chip tone-danger"><i class="fas fa-receipt me-1"></i>{{ cuotas_m }} cuota{{ 's' if cuotas_m != 1 }}</span>{% endif %}
-                            {% if otras %}<span class="chip tone-info">{{ otras }} otra{{ 's' if otras != 1 }}</span>{% endif %}
-                        </div>
-                        <span class="fw-bold text-danger num">Bs. {{ '%.2f'|format(suma_dueno) }}</span>
-                        <span class="text-muted small">({{ multas_dueno|length }} total)</span>
+                    <td data-label="Fecha" class="num">{{ m.fecha|fecha }}</td>
+                    <td data-label="Monto" class="derecha num">
+                        {% if m.es_reflejo_cuota %}<span class="tenue" title="Ya contada en la cuota pendiente">Bs {{ m.monto|bs }}</span>
+                        {% else %}<span class="monto-deuda">Bs {{ m.monto|bs }}</span>{% endif %}
                     </td>
-                    <td>
-                        <div class="d-flex flex-wrap gap-1">
-                            {% for terreno in dueno.terrenos %}
-                            <span class="chip"><i class="fas fa-map-marker-alt me-1"></i>{{ terreno.lugar }} · Mz. {{ terreno.manzano }}</span>
-                            {% else %}
-                            <span class="text-muted small">Sin terrenos</span>
-                            {% endfor %}
-                        </div>
-                    </td>
-                    <td class="text-end pe-3">
-                        <button class="btn btn-outline-primary btn-sm btn-ver-multas"
-                                data-nombre="{{ dueno.nombre }} {{ dueno.paterno or '' }}"
-                                data-duenioid="{{ dueno.id }}"
-                                data-multas='{{ detalle|tojson }}'>
-                            <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-                            Ver multas
-                        </button>
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones') %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('multa.multas_por_duenio', duenio_id=m.duenio_id) }}">{{ icono('person') }}Multas de este propietario</a>
+                            {% if es_admin %}
+                                {% if m.es_reflejo_cuota %}
+                                <a class="menu-item" role="menuitem" href="{{ url_for('cuota.update_cuota', cuota_id=m.cuota_id) }}">{{ icono('receipt_long') }}Ir a la cuota</a>
+                                {% else %}
+                                <a class="menu-item" role="menuitem" href="{{ url_for('multa.update_multa', multa_id=m.multa_id) }}">{{ icono('edit') }}Editar multa</a>
+                                <div class="menu-separador"></div>
+                                {{ item_borrar(url_for('multa.delete_multa', multa_id=m.multa_id),
+                                               'Se eliminará esta multa de Bs ' ~ m.monto|bs ~ '. No se puede deshacer.', titulo='¿Eliminar esta multa?') }}
+                                {% endif %}
+                            {% endif %}
+                        {% endcall %}
                     </td>
                 </tr>
-                {% else %}
-                <tr><td colspan="4">{{ empty_state('fa-gavel', 'Sin multas', 'No hay multas registradas en la base de datos.') }}</td></tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
+    {{ paginacion(multas_paginated, 'multas') }}
+    {% elif search or tipo %}
+    {{ vacio('Ninguna multa coincide con el filtro', 'Cambia la búsqueda o el tipo de multa.', url_for('multa.list_multas'), 'Ver todas las multas', 'list') }}
+    {% else %}
+    {{ vacio('No hay multas registradas', 'Las multas por inasistencia se crean solas al marcar a alguien ausente.',
+             url_for('multa.create_multa') if es_admin else None, 'Registrar multa', 'add') }}
+    {% endif %}
 </div>
-
-<!-- Modal de detalle de multas -->
-<div class="modal fade" id="verMultasModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title fw-bold">Historial de multas</h5>
-                    <div class="text-muted small" id="nombreDuenoMultas"></div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body p-0" id="contenidoMultas"></div>
-            <div class="modal-footer justify-content-between" id="resumenMultas"></div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    (function () {
-        var modalEl = document.getElementById('verMultasModal');
-        var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
-
-        function esc(v) {
-            var d = document.createElement('div');
-            d.textContent = v == null ? '' : String(v);
-            return d.innerHTML;
-        }
-
-        function chipTipo(tipo) {
-            if (tipo === 'asistencia') return '<span class="chip tone-warning"><i class="fas fa-user-times me-1"></i>Inasistencia</span>';
-            if (tipo === 'cuota') return '<span class="chip tone-danger"><i class="fas fa-receipt me-1"></i>Cuota pendiente</span>';
-            var t = String(tipo || 'otros').replace(/_/g, ' ');
-            return '<span class="chip tone-info">' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + '</span>';
-        }
-
-        function mostrar(nombre, data, duenioId) {
-            document.getElementById('nombreDuenoMultas').textContent = nombre;
-            var body = document.getElementById('contenidoMultas');
-            var resumen = document.getElementById('resumenMultas');
-
-            if (!data || !data.length) {
-                body.innerHTML = '<div class="empty p-4 text-center"><i class="fas fa-gavel fa-2x mb-2 text-muted"></i><h6>Sin multas</h6></div>';
-                resumen.innerHTML = '';
-                return;
-            }
-
-            var total = 0;
-            var filas = data.map(function (m) {
-                total += m.monto;
-                return '<tr>' +
-                    '<td class="ps-3">' + chipTipo(m.tipo) + '</td>' +
-                    '<td>' + (m.descripcion ? esc(m.descripcion) : '<span class="text-muted">—</span>') + '</td>' +
-                    '<td class="num fw-bold text-danger">Bs. ' + m.monto.toFixed(2) + '</td>' +
-                    '<td class="num text-muted pe-3">' + esc(m.fecha) + '</td>' +
-                    '</tr>';
-            }).join('');
-
-            body.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
-                '<thead><tr><th class="ps-3">Tipo</th><th>Descripción</th><th>Monto</th><th class="pe-3">Fecha</th></tr></thead>' +
-                '<tbody>' + filas + '</tbody></table></div>';
-
-            resumen.innerHTML = '<div>Total acumulado: <strong class="text-danger num">Bs. ' + total.toFixed(2) + '</strong> (' + data.length + ' multas)</div>' +
-                '<form method="post" action="/multas/duenio/' + duenioId + '/eliminar_todas" data-confirm="¿Regularizar y eliminar todas las multas de este propietario?">' +
-                '<button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-check-double me-1"></i>Marcar todas pagadas</button>' +
-                '</form>';
-        }
-
-        document.querySelectorAll('.btn-ver-multas').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var nombre = this.getAttribute('data-nombre');
-                var duenioId = this.getAttribute('data-duenioid');
-                var data = JSON.parse(this.getAttribute('data-multas') || '[]');
-                mostrar(nombre, data, duenioId);
-                if (modal) modal.show();
-            });
-        });
-
-        // Filtro de tabla en cliente
-        var filtro = document.getElementById('filtroTabla');
-        var filas = document.querySelectorAll('.fila-dueno');
-        var conteo = document.getElementById('conteoFilas');
-        if (filtro) {
-            filtro.addEventListener('input', function () {
-                var q = (this.value || '').trim().toLowerCase(), n = 0;
-                filas.forEach(function (f) {
-                    var ok = f.textContent.toLowerCase().indexOf(q) > -1;
-                    f.style.display = ok ? '' : 'none';
-                    if (ok) n++;
-                });
-                if (conteo) conteo.textContent = n + ' propietario' + (n !== 1 ? 's' : '');
-            });
-        }
-    })();
-</script>
 {% endblock %}

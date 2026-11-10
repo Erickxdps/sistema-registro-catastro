@@ -1,80 +1,16 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Nueva multa · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Nueva multa', 'Se agrega al historial del propietario y a su estado de cuenta', 'fa-gavel') %}{% endcall %}
+{{ cabecera('Registrar multa', 'Multa manual. Las de inasistencia se crean solas al marcar a alguien ausente.', volver=url_for('multa.list_multas'), volver_texto='Multas') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="createMultaForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">person_pin</span>
-                    Propietario sancionado
-                </label>
-                <input type="text" class="form-control mb-2" data-filter-for="duenio_id" placeholder="Filtrar por nombre o CI..." autocomplete="off">
-                <select id="duenio_id" name="duenio_id" required class="form-select">
-                    <option value="">Selecciona un propietario…</option>
-                    {% for duenio in duenios %}
-                    <option value="{{ duenio.id }}">{{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label for="tipo" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">category</span>
-                        Tipo de sanción
-                    </label>
-                    <select id="tipo" name="tipo" required class="form-select">
-                        <option value="">Selecciona un motivo…</option>
-                        <option value="asistencia">Inasistencia a reunión</option>
-                        <option value="cuota">Incumplimiento de cuota</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Monto (Bs.)"
-                        id="monto"
-                        name="monto"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
-                    </md-outlined-text-field>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <md-outlined-text-field
-                    label="Descripción detallada (opcional)"
-                    id="descripcion"
-                    name="descripcion"
-                    type="textarea"
-                    rows="3"
-                    placeholder="Detalles sobre el motivo o resolución de la multa...">
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">notes</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('multa.list_multas') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Registrar multa
-                </md-filled-button>
-            </div>
-        </form>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        {% set v = form %}
+        {% set dueno = duenio %}
+        {% include '_form_multa.html' %}
     </div>
-</div>
+    {{ pie_formulario(url_for('multa.list_multas'), 'Registrar multa', 'add') }}
+</form>
 {% endblock %}

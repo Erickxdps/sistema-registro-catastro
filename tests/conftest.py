@@ -16,7 +16,18 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP_DIR = ROOT / "app"
+REAL_DB = APP_DIR / "sistema.db"
 BACKUP_DB = ROOT / "backups" / "sistema.db.bak-20261110"
+
+
+def huella(ruta):
+    import hashlib
+    return hashlib.sha256(ruta.read_bytes()).hexdigest() if ruta.exists() else None
+
+
+# Huella de la BD real ANTES de importar la app: al final se comprueba que
+# ninguna prueba la modificó (ver `bd_real_intacta`).
+HUELLA_INICIAL = huella(REAL_DB)
 
 _TMP_IMPORT = tempfile.mkdtemp(prefix="circuata-import-")
 os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(_TMP_IMPORT, "import.db")
@@ -35,8 +46,20 @@ from models.reunion_model import Reunion  # noqa: E402,F401
 from models.terreno_model import Terreno  # noqa: E402
 from models.user_model import User  # noqa: E402
 
+# Solo en pruebas: hash rápido (scrypt tarda ~0,3 s por contraseña en esta máquina).
+import models.user_model as _user_model  # noqa: E402
+from werkzeug.security import generate_password_hash as _hash_real  # noqa: E402
+_user_model.generate_password_hash = lambda password: _hash_real(password, method="pbkdf2:sha256:1000")
+
 ADMIN_PASS = "admin-pruebas-123"
 DOCTOR_PASS = "doctor-pruebas-123"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def bd_real_intacta():
+    """Falla la sesión si alguna prueba modificó app/sistema.db."""
+    yield
+    assert huella(REAL_DB) == HUELLA_INICIAL, "Una prueba modificó app/sistema.db"
 
 
 def _crear_app(db_path, **extra):
@@ -122,12 +145,13 @@ def reunion_hoy():
 
 @pytest.fixture
 def app_copia_real(tmp_path):
-    """App sobre una COPIA del respaldo de la BD real (la original nunca se abre).
-    Se omite si el respaldo no existe (p. ej. en otra máquina o en CI)."""
-    if not BACKUP_DB.exists():
-        pytest.skip("No hay respaldo local de la BD real")
+    """App sobre una COPIA de la BD real actual (el original solo se lee para copiarlo).
+    Se omite si no hay BD local (p. ej. en otra máquina o en CI)."""
+    origen = REAL_DB if REAL_DB.exists() else BACKUP_DB
+    if not origen.exists():
+        pytest.skip("No hay BD local")
     copia = tmp_path / "copia_real.db"
-    shutil.copyfile(BACKUP_DB, copia)
+    shutil.copyfile(origen, copia)
     application = _crear_app(copia)
     yield application
     with application.app_context():

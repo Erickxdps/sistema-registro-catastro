@@ -1,14 +1,13 @@
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-<div class="mb-4">
-    {% for category, message in messages %}
-    {% set tone = 'danger' if category in ('error', 'danger') else category if category in ('success', 'warning', 'info') else 'info' %}
-    <div class="alert alert-{{ tone }} alert-dismissible fade show mb-2" role="alert">
-        <i class="fas fa-{{ 'exclamation-circle' if tone == 'danger' else 'check-circle' if tone == 'success' else 'exclamation-triangle' if tone == 'warning' else 'info-circle' }}"></i>
-        <div>{{ message }}</div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+{# Avisos del servidor (flash). Los éxitos se cierran solos; los errores esperan. #}
+<div class="avisos" aria-live="polite">
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+{% for categoria, mensaje in mensajes %}
+    {% set tipo = 'error' if categoria in ('error', 'danger') else 'aviso' if categoria == 'warning' else 'ok' %}
+    <div class="aviso{{ ' aviso-error' if tipo == 'error' else ' aviso-aviso' if tipo == 'aviso' else '' }}" role="{{ 'alert' if tipo == 'error' else 'status' }}">
+        <span class="ico" aria-hidden="true">{{ 'error' if tipo == 'error' else 'warning' if tipo == 'aviso' else 'check_circle' }}</span>
+        <p>{{ mensaje }}</p>
+        <button type="button" class="aviso-cerrar" aria-label="Cerrar aviso"><span class="ico" aria-hidden="true">close</span></button>
     </div>
-    {% endfor %}
-</div>
-{% endif %}
+{% endfor %}
 {% endwith %}
+</div>

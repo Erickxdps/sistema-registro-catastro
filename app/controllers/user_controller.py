@@ -27,47 +27,75 @@ user_bp = Blueprint("user", __name__)
 
 MIN_PASSWORD_LEN = 8
 
+ORDEN_DIRECTORIO = {
+    "nombre": [Duenio.nombre.asc(), Duenio.paterno.asc(), Duenio.id.asc()],
+    "-nombre": [Duenio.nombre.desc(), Duenio.paterno.desc(), Duenio.id.desc()],
+    "paterno": [Duenio.paterno.asc(), Duenio.nombre.asc(), Duenio.id.asc()],
+    "-paterno": [Duenio.paterno.desc(), Duenio.nombre.desc(), Duenio.id.desc()],
+    "registro": [Duenio.id.asc()],
+    "-registro": [Duenio.id.desc()],
+}
+
 
 @user_bp.route('/')
-@login_required  # El directorio contiene nombres y CI: nunca público
 def index():
-    """Página de inicio con estadísticas y directorio paginado de propietarios."""
-    # Conteos para las tarjetas de estadísticas (queries ligeras)
-    duenos_count = Duenio.query.count()
-    terrenos_count = Terreno.query.count()
-    reuniones_count = Reunion.query.count()
+    """Inicio PÚBLICO: plano de manzanos, recaudación y directorio paginado.
 
-    # Contamos tipos únicos de cuota, no instancias individuales
-    cuotas_count = db.session.query(Cuota.titulo).distinct().count()
+    Sin sesión se muestra lo que la junta publica: nombres, CI enmascarado,
+    cantidad de terrenos y si el propietario está al día. Los montos de deuda,
+    el CI completo y las acciones solo aparecen con sesión iniciada."""
+    from sqlalchemy import func
+    from utils.busqueda import filtro_por_palabras
+    from utils.fechas import hoy
+    from utils.pagination import obtener_orden, paginar
 
-    # Paginación y búsqueda del directorio de propietarios
-    page, per_page, search = obtener_paginacion(default_per_page=10)
+    autenticado = current_user.is_authenticated
+    page, per_page, search = obtener_paginacion()
+    orden, clausulas = obtener_orden(ORDEN_DIRECTORIO, "nombre")
 
     query = Duenio.query
-    if search:
-        filtro = f"%{search}%"
-        query = query.filter(
-            (Duenio.nombre.ilike(filtro)) |
-            (Duenio.paterno.ilike(filtro)) |
-            (Duenio.materno.ilike(filtro)) |
-            (Duenio.ci.ilike(filtro))
-        )
+    filtro = filtro_por_palabras(search, [Duenio.nombre, Duenio.paterno, Duenio.materno]
+                                 + ([Duenio.ci] if autenticado else []))
+    if filtro is not None:
+        query = query.filter(filtro)
+    duenos_paginated = paginar(query.order_by(*clausulas), page, per_page)
+    ids = [d.id for d in duenos_paginated.items]
 
-    duenos_paginated = query.order_by(Duenio.id).paginate(page=page, per_page=per_page, error_out=False)
+    emisiones = Cuota.resumen_emisiones()
+    hoy_ = hoy()
+    proxima = (Reunion.query.filter(Reunion.fecha >= hoy_)
+               .order_by(Reunion.fecha.asc(), Reunion.hora.asc()).first())
+    ultimas = (Reunion.query.filter(Reunion.fecha < hoy_)
+               .order_by(Reunion.fecha.desc(), Reunion.id.desc()).limit(3).all())
+    presentes = dict(db.session.query(Asistencia.id_reunion, func.count(Asistencia.id))
+                     .filter(Asistencia.asistio.is_(True),
+                             Asistencia.id_reunion.in_([r.id for r in ultimas] or [0]))
+                     .group_by(Asistencia.id_reunion).all())
 
-    # Función auxiliar para sumar multas de una lista
-    def total_multas(lista_multas):
-        return sum(m.monto for m in lista_multas)
+    alertas = None
+    if autenticado and current_user.has_role("admin"):
+        alertas = {
+            "roles_invalidos": User.query.filter(User.role.notin_(("admin", "doctor"))).count(),
+            "sin_terreno": Duenio.query.filter(~Duenio.terrenos.any()).count(),
+        }
 
     return render_template(
         'index.html',
-        duenos_count=duenos_count,
-        terrenos_count=terrenos_count,
-        reuniones_count=reuniones_count,
-        cuotas_count=cuotas_count,
+        duenos_count=Duenio.query.count(),
+        terrenos_count=Terreno.query.count(),
+        reuniones_count=Reunion.query.count(),
+        cuotas_count=len(emisiones),
+        emisiones=emisiones,
+        plano=Terreno.plano_manzanos(),
+        proxima=proxima,
+        ultimas=ultimas,
+        presentes=presentes,
+        alertas=alertas,
         duenos_paginated=duenos_paginated,
+        deudas=Duenio.deudas_por_propietario(ids),
+        lotes=Duenio.terrenos_por_propietario(ids),
         search=search,
-        multas=total_multas,
+        orden=orden,
     )
 
 
@@ -77,9 +105,20 @@ def index():
 @login_required
 @role_required("admin")
 def list_users():
-    """Lista todos los usuarios del sistema. Solo administradores."""
-    users = User.get_all()
-    return user_view.usuarios(users)
+    """Lista paginada de usuarios con búsqueda. Solo administradores."""
+    from utils.busqueda import filtro_por_palabras
+    from utils.pagination import obtener_orden, paginar
+    page, per_page, search = obtener_paginacion()
+    orden, clausulas = obtener_orden({
+        "usuario": [User.username.asc()], "-usuario": [User.username.desc()],
+        "rol": [User.role.asc(), User.username.asc()], "-rol": [User.role.desc(), User.username.asc()],
+    }, "usuario")
+    query = User.query
+    filtro = filtro_por_palabras(search, [User.username, User.role])
+    if filtro is not None:
+        query = query.filter(filtro)
+    users = paginar(query.order_by(*clausulas), page, per_page)
+    return user_view.usuarios(users, search=search, orden=orden)
 
 
 @user_bp.route("/login", methods=["GET", "POST"])

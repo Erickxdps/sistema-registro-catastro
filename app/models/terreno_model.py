@@ -1,14 +1,17 @@
+# models/terreno_model.py
 from database import db
+
 
 class Terreno(db.Model):
     __tablename__ = "Terreno"
     id = db.Column(db.Integer, primary_key=True)
-    duenio_id = db.Column(db.Integer, db.ForeignKey('Duenio.id', ondelete='CASCADE'), nullable=False)
+    duenio_id = db.Column(db.Integer, db.ForeignKey('Duenio.id', ondelete='CASCADE'), nullable=False, index=True)
     lugar = db.Column(db.String(100), nullable=False)
-    manzano = db.Column(db.Integer, nullable=False)
-    metros_cuadrados = db.Column(db.Integer, nullable=False)
+    manzano = db.Column(db.Integer, nullable=False, index=True)
+    # Float: el 94 % de las superficies registradas tienen decimales.
+    # (SQLite no cambia nada: ya guardaba esos valores como REAL.)
+    metros_cuadrados = db.Column(db.Float, nullable=False)
     dueno = db.relationship('Duenio', backref='terrenos')
-
 
     def __init__(self, duenio_id, lugar, manzano, metros_cuadrados):
         self.duenio_id = duenio_id
@@ -22,13 +25,15 @@ class Terreno(db.Model):
 
     @staticmethod
     def get_all():
-        return Terreno.query.all()
+        return Terreno.query.order_by(Terreno.id).all()
 
     @staticmethod
     def get_by_id(id):
-        return Terreno.query.get(id)
+        return db.session.get(Terreno, id)
 
     def update(self, duenio_id=None, lugar=None, manzano=None, metros_cuadrados=None):
+        """Actualiza el terreno. Si cambia de propietario, los reflejos de sus
+        cuotas pendientes pasan al nuevo propietario (o se eliminan si es inmune)."""
         if duenio_id is not None:
             self.duenio_id = duenio_id
         if lugar is not None:
@@ -37,29 +42,47 @@ class Terreno(db.Model):
             self.manzano = manzano
         if metros_cuadrados is not None:
             self.metros_cuadrados = metros_cuadrados
+        db.session.flush()
+        db.session.refresh(self, ["dueno"])
+        for cuota in list(self.cuotas):
+            cuota.sincronizar_multa()
         db.session.commit()
 
-    def delete(self):
-        # Eliminar registros relacionados manualmente para evitar errores de foreign key
+    def eliminar(self):
+        """Elimina el terreno con sus cuotas y los reflejos de estas. No hace commit."""
         from models.cuota_model import Cuota
         from models.multa_model import Multa
-        
+
+        ids = db.session.query(Cuota.cuota_id).filter(Cuota.terreno_id == self.id)
+        Multa.query.filter(Multa.tipo == "cuota", Multa.cuota_id.in_(ids)).delete(synchronize_session=False)
+        Cuota.query.filter(Cuota.terreno_id == self.id).delete(synchronize_session=False)
+        db.session.delete(self)
+
+    def delete(self):
         try:
-            # 1. Primero eliminar todas las multas relacionadas a las cuotas de este terreno
-            cuotas = Cuota.query.filter_by(terreno_id=self.id).all()
-            for cuota in cuotas:
-                # Eliminar multas relacionadas a estas cuotas (tipo 'cuota')
-                multas_cuota = Multa.query.filter_by(cuota_id=cuota.cuota_id).all()
-                for multa in multas_cuota:
-                    db.session.delete(multa)  # Eliminar la multa completamente
-                
-                # Eliminar la cuota
-                db.session.delete(cuota)
-            
-            # 2. Finalmente eliminar el terreno
-            db.session.delete(self)
+            self.eliminar()
             db.session.commit()
-            
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise
+
+    @staticmethod
+    def plano_manzanos():
+        """Para el plano del inicio: por manzano, terrenos y cuotas pagadas/total."""
+        from sqlalchemy import case, func
+        from models.cuota_model import Cuota
+        terrenos = dict(db.session.query(Terreno.manzano, func.count(Terreno.id)).group_by(Terreno.manzano).all())
+        cuotas = {m: (int(t or 0), int(p or 0)) for m, t, p in (
+            db.session.query(Terreno.manzano, func.count(Cuota.cuota_id),
+                             func.sum(case((Cuota.pagado.is_(True), 1), else_=0)))
+            .join(Cuota, Cuota.terreno_id == Terreno.id)
+            .group_by(Terreno.manzano).all())}
+        plano = []
+        for manzano in sorted(terrenos):
+            total, pagadas = cuotas.get(manzano, (0, 0))
+            plano.append({
+                "manzano": manzano, "terrenos": int(terrenos[manzano]),
+                "cuotas": total, "pagadas": pagadas,
+                "porcentaje": round(pagadas / total * 100) if total else None,
+            })
+        return plano

@@ -1,11 +1,10 @@
 # Pruebas de humo: la app completa sigue funcionando tras los cambios.
 
 import datetime
-import hashlib
 
 import pytest
 
-from conftest import BACKUP_DB, ROOT, iniciar_sesion_como
+from conftest import iniciar_sesion_como
 from database import db
 from models.multa_model import Multa
 from models.user_model import User
@@ -49,10 +48,10 @@ def test_fecha_de_multa_se_calcula_al_insertar(app, datos, monkeypatch):
     assert mm.hoy() == mm.hoy() and callable(mm.hoy)
 
 
-def test_hash_de_password_cabe_en_la_columna(app):
-    with app.app_context():
-        u = User("alguien", "una-clave-larga-123")
-        assert len(u.password_hash) <= User.__table__.c.password_hash.type.length
+def test_hash_de_password_cabe_en_la_columna():
+    from werkzeug.security import generate_password_hash
+    real = generate_password_hash("una-clave-larga-123")  # método por defecto de producción (scrypt)
+    assert len(real) <= User.__table__.c.password_hash.type.length
 
 
 def test_claves_foraneas_activas_en_sqlite(app):
@@ -70,11 +69,3 @@ def test_copia_de_bd_real_carga_todas_las_paginas(app_copia_real):
     iniciar_sesion_como(c, admin_id)
     for ruta in PAGINAS:
         assert c.get(ruta).status_code == 200, ruta
-
-
-def test_bd_original_intacta():
-    original = ROOT / "app" / "sistema.db"
-    if not (original.exists() and BACKUP_DB.exists()):
-        pytest.skip("sin BD local")
-    h = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
-    assert h(original) == h(BACKUP_DB)

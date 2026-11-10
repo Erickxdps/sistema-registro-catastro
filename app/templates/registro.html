@@ -1,62 +1,32 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Registrar usuario · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 520px; margin: 0 auto;">
-    {% call page_header('Registrar usuario', 'Crea una cuenta de acceso al sistema', 'fa-user-plus') %}{% endcall %}
+{{ cabecera('Crear usuario', 'La persona podrá entrar con este usuario y contraseña.', volver=url_for('user.list_users'), volver_texto='Usuarios') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="registerForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Nombre de usuario"
-                    id="username"
-                    name="username"
-                    required
-                    autofocus
-                    autocomplete="username">
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">person</md-icon>
-                </md-outlined-text-field>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        <div class="campos">
+            <div class="campo">
+                <label for="username">Usuario</label>
+                <input id="username" name="username" type="text" required minlength="3" maxlength="100" autocomplete="off"
+                       value="{{ request.form.get('username', '') }}">
             </div>
-
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Contraseña"
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    autocomplete="new-password">
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">lock</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="mb-4">
-                <label for="role" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">admin_panel_settings</span>
-                    Rol de usuario
-                </label>
-                <select id="role" name="role" required class="form-select">
-                    <option value="admin">Administrador (admin)</option>
-                    <option value="doctor" selected>Usuario regular (doctor / operador)</option>
+            <div class="campo">
+                <label for="role">Permisos</label>
+                <select id="role" name="role">
+                    <option value="doctor"{% if request.form.get('role') != 'admin' %} selected{% endif %}>Consulta: puede ver, no modificar</option>
+                    <option value="admin"{% if request.form.get('role') == 'admin' %} selected{% endif %}>Administración: puede registrar y editar</option>
                 </select>
             </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('user.list_users') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Registrar usuario
-                </md-filled-button>
+            <div class="campo">
+                <label for="password">Contraseña</label>
+                <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" aria-describedby="pass-ayuda">
+                <p class="ayuda" id="pass-ayuda">Al menos 8 caracteres.</p>
             </div>
-        </form>
+        </div>
     </div>
-</div>
+    {{ pie_formulario(url_for('user.list_users'), 'Crear usuario', 'person_add') }}
+</form>
 {% endblock %}

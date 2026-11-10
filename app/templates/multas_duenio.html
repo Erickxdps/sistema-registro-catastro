@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import icono, cabecera, vacio, menu_acciones, item_borrar %}
+
+{% block content %}
+{% set es_admin = current_user.has_role('admin') %}
+{% set reales = multas|selectattr('suma_a_deuda')|list %}
+{% call cabecera(duenio.nombre_completo, 'CI ' ~ duenio.ci ~ '. Multas registradas y deuda actual.', volver=url_for('multa.list_multas'), volver_texto='Multas') %}
+    <a class="boton" href="{{ url_for('reporte.estado_cuenta_imprimible', duenio_id=duenio.id) }}">{{ icono('print') }}Estado de cuenta</a>
+    {% if es_admin and not duenio.es_immune %}<a class="boton boton-principal" href="{{ url_for('multa.create_multa', duenio_id=duenio.id) }}">{{ icono('add') }}Registrar multa</a>{% endif %}
+{% endcall %}
+
+<div class="hoja">
+    <div class="ficha">
+        <div><span>Cuotas pendientes</span><strong class="num">Bs {{ deuda.cuotas|bs }}</strong></div>
+        <div><span>Multas</span><strong class="num">Bs {{ deuda.multas|bs }}</strong></div>
+        <div><span>Deuda total</span><strong class="num {{ 'monto-deuda' if deuda.total > 0 else '' }}">Bs {{ deuda.total|bs }}</strong></div>
+    </div>
+</div>
+
+<div class="hoja" style="margin-top: 28px">
+    <div class="hoja-cabeza">
+        <div>
+            <h2>Multas</h2>
+            <p>Las de cuota impaga se muestran como referencia: se pagan desde Cuotas y no se suman dos veces.</p>
+        </div>
+        {% if es_admin and reales %}
+        <form method="post" action="{{ url_for('multa.eliminar_multas_duenio', duenio_id=duenio.id) }}"
+              data-confirm="Se eliminarán las {{ reales|length }} multas de inasistencia y manuales de {{ duenio.nombre_completo }} (Bs {{ deuda.multas|bs }}). Sus cuotas pendientes no cambian."
+              data-confirm-titulo="¿Regularizar las multas?" data-confirm-accion="Regularizar multas">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="boton">{{ icono('task_alt') }}Regularizar multas</button>
+        </form>
+        {% endif %}
+    </div>
+    {% if multas %}
+    <div class="tabla-marco">
+        <table class="tabla">
+            <thead>
+                <tr><th>Motivo</th><th>Fecha</th><th class="derecha">Monto</th>{% if es_admin %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}</tr>
+            </thead>
+            <tbody>
+            {% for m in multas %}
+                <tr>
+                    <td class="celda-titulo">
+                        {% if m.es_reflejo_cuota %}<span class="etiqueta etiqueta-pend">Cuota impaga</span>
+                        {% elif m.tipo == 'asistencia' %}<span class="etiqueta etiqueta-deuda">Inasistencia</span>
+                        {% else %}<span class="etiqueta">Manual</span>{% endif %}
+                        <span class="celda-secundaria">{{ m.descripcion or 'Sin detalle' }}</span>
+                    </td>
+                    <td data-label="Fecha" class="num">{{ m.fecha|fecha }}</td>
+                    <td data-label="Monto" class="derecha num">
+                        {% if m.es_reflejo_cuota %}<span class="tenue">Bs {{ m.monto|bs }}</span>{% else %}<span class="monto-deuda">Bs {{ m.monto|bs }}</span>{% endif %}
+                    </td>
+                    {% if es_admin %}
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones') %}
+                            {% if m.es_reflejo_cuota %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('cuota.update_cuota', cuota_id=m.cuota_id) }}">{{ icono('receipt_long') }}Ir a la cuota</a>
+                            {% else %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('multa.update_multa', multa_id=m.multa_id) }}">{{ icono('edit') }}Editar multa</a>
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('multa.delete_multa', multa_id=m.multa_id), 'Se eliminará esta multa de Bs ' ~ m.monto|bs ~ '.', titulo='¿Eliminar esta multa?') }}
+                            {% endif %}
+                        {% endcall %}
+                    </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    {{ vacio('Sin multas', duenio.nombre_completo ~ ' no tiene multas registradas.') }}
+    {% endif %}
+</div>
+{% endblock %}

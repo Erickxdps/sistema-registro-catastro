@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import cabecera, pie_formulario %}
+
+{% block content %}
+{{ cabecera('Editar multa', 'Registrada el ' ~ multa.fecha|fecha, volver=url_for('multa.list_multas'), volver_texto='Multas') }}
+
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        {% set v = multa %}
+        {% set dueno = multa.duenio %}
+        {% include '_form_multa.html' %}
+    </div>
+    {{ pie_formulario(url_for('multa.list_multas'), 'Guardar cambios') }}
+</form>
+{% endblock %}

@@ -1,158 +1,41 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Programar reunión · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, pie_formulario %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Programar reunión', 'Puede ser una asamblea futura o una reunión a registrar', 'fa-calendar-plus') %}{% endcall %}
+{{ cabecera('Convocar reunión', 'Se creará la lista de asistencia con todos los propietarios del padrón.', volver=url_for('reunion.list_reuniones'), volver_texto='Reuniones') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="reunionForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Descripción / Tema de la reunión"
-                    id="descripcion"
-                    name="descripcion"
-                    placeholder="Reunión mensual de propietarios, asamblea general…"
-                    required
-                    autofocus>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">event_note</md-icon>
-                </md-outlined-text-field>
+{# Sin JavaScript se envía como formulario normal; con JavaScript usa /api/reuniones/create (mismo contrato). #}
+<form method="post" class="hoja formulario" data-json="{{ url_for('reunion.create_reunion_ajax') }}"
+      data-destino="{{ url_for('reunion.list_reuniones') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        <div class="campos">
+            <div class="campo campo-ancho">
+                <label for="descripcion">Tema <span class="opcional">(opcional)</span></label>
+                <input id="descripcion" name="descripcion" type="text" maxlength="255" placeholder="Ej.: Asamblea ordinaria, mantenimiento del canal">
             </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Fecha"
-                        id="fecha"
-                        name="fecha"
-                        type="date"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">calendar_today</md-icon>
-                    </md-outlined-text-field>
+            <div class="campo">
+                <label for="fecha">Fecha</label>
+                <input id="fecha" name="fecha" type="date" required>
+            </div>
+            <div class="campo">
+                <label for="hora">Hora</label>
+                <input id="hora" name="hora" type="time" required value="19:00">
+            </div>
+            <div class="campo">
+                <label for="monto_multa">Multa por inasistencia</label>
+                <div class="con-prefijo">
+                    <span>Bs</span>
+                    <input id="monto_multa" name="monto_multa" type="number" min="0" step="0.5" value="100" data-tipo="numero" inputmode="decimal" aria-describedby="multa-ayuda">
                 </div>
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Hora de inicio"
-                        id="hora"
-                        name="hora"
-                        type="time"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">schedule</md-icon>
-                    </md-outlined-text-field>
-                </div>
+                <p class="ayuda" id="multa-ayuda">Se aplica a quien no asista. Pon 0 si la reunión no tiene multa.</p>
             </div>
-
-            <div class="mb-4">
-                <md-outlined-text-field
-                    label="Monto de multa por inasistencia (Bs.)"
-                    id="monto_multa"
-                    name="monto_multa"
-                    type="number"
-                    value="100.0"
-                    step="0.01"
-                    min="0"
-                    supporting-text="Se asigna como sanción a quienes queden registrados como ausentes">
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="notice mb-4">
-                <span class="material-symbols-outlined" style="color: rgb(var(--t-info));">info</span>
-                <div>Al confirmar, se generan las fichas de asistencia para todos los propietarios registrados.</div>
-            </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('reunion.list_reuniones') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit" id="submitBtn">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Programar reunión
-                </md-filled-button>
-            </div>
-        </form>
-
-        <div id="progressContainer" class="mt-4" style="display:none;">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="spinner-border spinner-border-sm text-primary"></span>
-                <strong>Creando reunión y procesando propietarios…</strong>
-            </div>
-            <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>
-            <div class="text-muted small mt-2">Generando asistencias y multas por inasistencia. No cierres esta ventana.</div>
         </div>
-
-        <div id="resultContainer" class="mt-4" style="display:none;">
-            <div id="resultAlert" class="alert" role="alert"><i id="resultIcon"></i><div id="resultMessage"></div></div>
-        </div>
+        <p class="nota nota-pend" data-progreso hidden>
+            <span class="ico" aria-hidden="true">hourglass_top</span>
+            <span>Creando la lista de asistencia de todos los propietarios. Puede tardar unos segundos.</span>
+        </p>
     </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.getElementById('reunionForm').addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        var descField = document.getElementById('descripcion');
-        var fechaField = document.getElementById('fecha');
-        var horaField = document.getElementById('hora');
-        var montoField = document.getElementById('monto_multa');
-
-        var data = {
-            fecha: fechaField.value,
-            hora: horaField.value,
-            descripcion: (descField.value || '').trim(),
-            monto_multa: parseFloat(montoField.value) || 100.0
-        };
-
-        var btn = document.getElementById('submitBtn');
-        var progress = document.getElementById('progressContainer');
-        var result = document.getElementById('resultContainer');
-        var alertBox = document.getElementById('resultAlert');
-        var icon = document.getElementById('resultIcon');
-        var msg = document.getElementById('resultMessage');
-
-        btn.disabled = true;
-        progress.style.display = 'block';
-        result.style.display = 'none';
-
-        function show(ok, html) {
-            progress.style.display = 'none';
-            result.style.display = 'block';
-            alertBox.className = 'alert alert-' + (ok ? 'success' : 'danger');
-            icon.className = 'fas fa-' + (ok ? 'check-circle' : 'exclamation-circle');
-            msg.innerHTML = html;
-        }
-        function esc(v) {
-            var d = document.createElement('div');
-            d.textContent = v == null ? '' : String(v);
-            return d.innerHTML;
-        }
-
-        try {
-            var response = await fetch('/api/reuniones/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            var res = await response.json();
-
-            if (res.success) {
-                show(true, '<strong>' + esc(res.message) + '</strong><br><small>Se procesaron ' + esc(res.total_procesados) + ' propietarios. Redirigiendo…</small>');
-                setTimeout(function () { window.location.href = "{{ url_for('reunion.list_reuniones') }}"; }, 2000);
-                return;
-            }
-            show(false, '<strong>Error:</strong> ' + esc(res.error));
-        } catch (err) {
-            show(false, '<strong>Error de conexión:</strong> ' + esc(err.message));
-        }
-
-        btn.disabled = false;
-    });
-</script>
+    {{ pie_formulario(url_for('reunion.list_reuniones'), 'Convocar reunión', 'event', ayuda='Todos empiezan como ausentes; márcalos presentes durante la reunión.') }}
+</form>
 {% endblock %}

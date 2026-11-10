@@ -12,7 +12,7 @@ from models.duenio_model import Duenio
 from models.user_model import User
 
 RUTAS_PRIVADAS = [
-    "/", "/duenios", "/terrenos", "/asistencias", "/cuotas", "/multas", "/reportes",
+    "/duenios", "/terrenos", "/asistencias", "/cuotas", "/multas", "/reportes",
     "/users", "/reportes/exportar/duenios", "/reportes/exportar/cuotas",
     "/reportes/exportar/multas", "/api/dueno/1/cuotas", "/api/dueno/1/terrenos",
     "/api/dueno/1/asistencias", "/cuotas/pendientes",
@@ -26,10 +26,16 @@ def test_rutas_con_datos_personales_requieren_login(client, datos, ruta):
     assert "/login" in resp.headers["Location"]
 
 
-def test_inicio_anonimo_no_muestra_ci(client, datos):
-    resp = client.get("/", follow_redirects=True)
+def test_inicio_es_publico_y_enmascara_ci(client, datos):
+    """Decisión del negocio: cualquiera ve el inicio; editar exige sesión."""
+    resp = client.get("/")
     assert resp.status_code == 200
-    assert b"T-1001" not in resp.data
+    html = resp.data.decode()
+    assert "Ana Pruebas Uno" in html          # el directorio es público
+    assert "T-1001" not in html               # pero el CI completo no
+    assert "001" in html                      # solo sus últimos dígitos
+    assert "Debe Bs" not in html              # ni los montos de deuda
+    assert "/duenios/" not in html            # ni enlaces de edición
 
 
 def test_reuniones_publica_no_falla_para_anonimo(client, datos):

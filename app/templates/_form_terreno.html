@@ -1,0 +1,28 @@
+{# Campos del terreno. Espera `v` (valores) y `dueno` (propietario elegido o None). #}
+{% from '_macros.html' import buscador %}
+<div class="campos">
+    <div class="campo-ancho">
+        {{ buscador('buscar-propietario', url_for('busqueda.buscar_propietarios'), 'Propietario', nombre='duenio_id', modo='seleccion',
+                    valor=dueno.id if dueno else '', texto=dueno.nombre_completo if dueno else '',
+                    detalle=('CI ' ~ dueno.ci) if dueno else '',
+                    placeholder='Escribe parte del nombre o apellido', requerido=True,
+                    ayuda='Elige al propietario de la lista. Puedes escribir nombre y apellido en cualquier orden.',
+                    mensaje_requerido='Elige un propietario de la lista de sugerencias.') }}
+    </div>
+    <div class="campo">
+        <label for="lugar">Lote</label>
+        <input id="lugar" name="lugar" type="text" required maxlength="100" autocomplete="off" value="{{ v.lugar or '' }}" placeholder="Ej.: 12 o A-3">
+    </div>
+    <div class="campo">
+        <label for="manzano">Manzano</label>
+        <input id="manzano" name="manzano" type="number" required min="0" step="1" inputmode="numeric" value="{{ v.manzano if v.manzano is not none else '' }}">
+    </div>
+    <div class="campo">
+        <label for="metros_cuadrados">Superficie</label>
+        <div class="con-unidad">
+            <input id="metros_cuadrados" name="metros_cuadrados" type="number" required min="0.01" step="0.01" inputmode="decimal"
+                   value="{{ v.metros_cuadrados if v.metros_cuadrados is not none else '' }}">
+            <span>m²</span>
+        </div>
+    </div>
+</div>

@@ -22,6 +22,13 @@ reporte_bp = Blueprint("reporte", __name__)
 
 
 # ── Estilos para hojas de cálculo Excel ───────────────────────────────────────
+def _celda_segura(valor):
+    """Evita que un texto como '=HYPERLINK(...)' se ejecute como fórmula en Excel."""
+    if isinstance(valor, str) and valor[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + valor
+    return valor
+
+
 def _aplicar_estilos_excel(ws, titulo="REPORTE"):
     """Aplica formato visual profesional de la Junta de Vecinos a la hoja de Excel."""
     # Colores corporativos
@@ -34,6 +41,10 @@ def _aplicar_estilos_excel(ws, titulo="REPORTE"):
         top=Side(style='thin', color='D9D9D9'),
         bottom=Side(style='thin', color='D9D9D9')
     )
+
+    for fila in ws.iter_rows(min_row=2):
+        for celda in fila:
+            celda.value = _celda_segura(celda.value)
 
     # Insertar título general en la fila 1 y 2
     ws.insert_rows(1, 2)
@@ -79,9 +90,11 @@ def index():
     monto_pendiente = monto_cuotas_total - monto_recaudado
     porcentaje_recaudacion = round((monto_recaudado / monto_cuotas_total * 100), 1) if monto_cuotas_total > 0 else 0
 
-    # Métricas de multas
-    multas = Multa.query.all()
+    # Métricas de multas: solo las que suman a la deuda. Los reflejos de cuota
+    # ya están contados en "cuotas pendientes" (evita el doble cobro).
+    multas = Multa.query.filter(Multa.filtro_suma_a_deuda()).all()
     monto_multas_total = sum(m.monto for m in multas)
+    emisiones = Cuota.resumen_emisiones()
 
     return render_template(
         "reportes.html",
@@ -94,7 +107,8 @@ def index():
         monto_pendiente=monto_pendiente,
         porcentaje_recaudacion=porcentaje_recaudacion,
         total_multas=len(multas),
-        monto_multas_total=monto_multas_total
+        monto_multas_total=monto_multas_total,
+        emisiones=emisiones,
     )
 
 
@@ -107,13 +121,15 @@ def exportar_duenios():
     ws = wb.active
     ws.title = "Propietarios"
 
-    ws.append(["ID", "Nombre", "Apellido Paterno", "Apellido Materno", "CI", "Cantidad Terrenos", "Lotes Asignados", "Multas Pendientes", "Total Multas (Bs.)"])
+    ws.append(["ID", "Nombre", "Apellido Paterno", "Apellido Materno", "CI", "Cantidad Terrenos", "Lotes Asignados",
+               "Multas", "Total Multas (Bs.)", "Cuotas Pendientes (Bs.)", "Deuda Total (Bs.)"])
 
     duenios = Duenio.query.order_by(Duenio.nombre.asc()).all()
+    deudas = Duenio.deudas_por_propietario([d.id for d in duenios])
     for d in duenios:
         terrenos = d.terrenos or []
         lotes_str = ", ".join(f"Lote {t.lugar} (Mz. {t.manzano})" for t in terrenos) if terrenos else "Sin terrenos"
-        multas = d.multas or []
+        multas = [m for m in (d.multas or []) if m.suma_a_deuda]
         total_multas = sum(m.monto for m in multas)
 
         ws.append([
@@ -125,7 +141,9 @@ def exportar_duenios():
             len(terrenos),
             lotes_str,
             len(multas),
-            float(total_multas)
+            float(total_multas),
+            deudas[d.id]["cuotas"],
+            deudas[d.id]["total"],
         ])
 
     _aplicar_estilos_excel(ws, "PADRÓN DE PROPIETARIOS")
@@ -190,7 +208,7 @@ def exportar_multas():
     ws = wb.active
     ws.title = "Multas"
 
-    ws.append(["ID Multa", "Propietario", "CI", "Tipo de Sanción", "Monto (Bs.)", "Fecha", "Descripción"])
+    ws.append(["ID Multa", "Propietario", "CI", "Tipo de Sanción", "Monto (Bs.)", "Fecha", "Descripción", "Suma a la deuda"])
 
     multas = Multa.query.order_by(Multa.multa_id.desc()).all()
     for m in multas:
@@ -205,7 +223,8 @@ def exportar_multas():
             "Inasistencia" if m.tipo == "asistencia" else "Cuota no pagada" if m.tipo == "cuota" else m.tipo,
             float(m.monto),
             m.fecha.strftime('%d/%m/%Y') if m.fecha else "N/A",
-            m.descripcion or ""
+            m.descripcion or "",
+            "Sí" if m.suma_a_deuda else "No (ya contada en la cuota)",
         ])
 
     _aplicar_estilos_excel(ws, "REGISTRO DE MULTAS Y SANCIONES")
@@ -229,7 +248,9 @@ def estado_cuenta_imprimible(duenio_id):
         return redirect(url_for("duenio.list_duenios"))
 
     terrenos = duenio.terrenos or []
-    multas = duenio.multas or []
+    # Solo multas que suman a la deuda: el reflejo de una cuota pendiente ya
+    # aparece en la tabla de cuotas pendientes.
+    multas = [m for m in (duenio.multas or []) if m.suma_a_deuda]
     total_multas = sum(m.monto for m in multas)
 
     # Buscar todas las cuotas de sus terrenos

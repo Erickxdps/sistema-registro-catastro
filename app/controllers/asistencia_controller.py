@@ -1,239 +1,191 @@
 # controllers/asistencia_controller.py
-# Controlador de asistencias — refactorizado para:
-#   1. Reemplazar es_dueno_inmune() por duenio.es_immune (propiedad del modelo).
-#   2. Eliminar if/else de autorización duplicados (ya cubiertos por decoradores).
-#   3. Eliminar sentencias print() de depuración del código de producción.
-#   4. Mejorar manejo de errores con try/except.
+# Asistencias: listado paginado con filtros (reunión, estado, búsqueda) y
+# operaciones que mantienen sincronizada la multa de inasistencia.
 #
 # IMPORTANTE: nombres de rutas, Blueprint y columnas de BD sin cambios.
 
-from flask import Blueprint, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, flash, redirect, request, url_for
 from flask_login import login_required
-from sqlalchemy import or_
+from sqlalchemy import case, func
 
-from models.asistencia_model import Asistencia
-from models.duenio_model     import Duenio
-from models.reunion_model    import Reunion
-from models.multa_model      import Multa
-from views import asistencia_view
-from utils.decorators import role_required
-from utils.pagination import obtener_paginacion
 from database import db
+from models.asistencia_model import Asistencia
+from models.duenio_model import Duenio
+from models.reunion_model import Reunion
+from utils.busqueda import filtro_por_palabras
+from utils.decorators import role_required
+from utils.http import es_url_interna
+from utils.pagination import obtener_orden, obtener_paginacion, paginar
+from views import asistencia_view
 
 asistencia_bp = Blueprint("asistencia", __name__)
 
+ORDEN_ASISTENCIAS = {
+    "-fecha": [Reunion.fecha.desc(), Duenio.nombre.asc(), Asistencia.id.asc()],
+    "fecha": [Reunion.fecha.asc(), Duenio.nombre.asc(), Asistencia.id.asc()],
+    "propietario": [Duenio.nombre.asc(), Duenio.paterno.asc(), Asistencia.id.asc()],
+    "-propietario": [Duenio.nombre.desc(), Duenio.paterno.desc(), Asistencia.id.asc()],
+    "estado": [Asistencia.asistio.asc(), Duenio.nombre.asc(), Asistencia.id.asc()],
+    "-estado": [Asistencia.asistio.desc(), Duenio.nombre.asc(), Asistencia.id.asc()],
+}
 
-# ─────────────────────────── LISTADO ─────────────────────────────────────────
+
+def _leer_asistio(valor):
+    return (valor or "").strip().lower() in ("true", "on", "1", "si", "sí")
+
+
+def _mensaje(asistio, con_multa):
+    if asistio:
+        return "Asistencia registrada: presente.", "success"
+    if con_multa:
+        return "Asistencia registrada: ausente. Se aplicó la multa de la reunión.", "warning"
+    return "Asistencia registrada: ausente. No corresponde multa.", "success"
+
+
+def _destino(valor):
+    """Vuelve a la página del listado de la que vino el usuario (con sus filtros)."""
+    return valor if es_url_interna(valor) and valor.startswith("/asistencias") \
+        else url_for("asistencia.list_asistencias")
+
 
 @asistencia_bp.route("/asistencias")
 @login_required
 def list_asistencias():
-    """Lista paginada de asistencias con búsqueda y estadísticas globales."""
-    page, per_page, search = obtener_paginacion(default_per_page=20)
+    page, per_page, search = obtener_paginacion()
+    orden, clausulas = obtener_orden(ORDEN_ASISTENCIAS, "-fecha")
+    reunion_id = request.args.get("reunion_id", type=int)
+    estado = request.args.get("estado", "", type=str)
 
-    # Query base con JOINs necesarios para búsqueda y ordenamiento
-    query = db.session.query(Asistencia).join(Duenio).join(Reunion)
+    query = (db.session.query(Asistencia)
+             .join(Duenio, Duenio.id == Asistencia.duenio_id)
+             .join(Reunion, Reunion.id == Asistencia.id_reunion))
+    reunion = db.session.get(Reunion, reunion_id) if reunion_id else None
+    if reunion:
+        query = query.filter(Asistencia.id_reunion == reunion.id)
+    filtro = filtro_por_palabras(search, [Duenio.nombre, Duenio.paterno, Duenio.materno,
+                                          Duenio.ci, Reunion.descripcion])
+    if filtro is not None:
+        query = query.filter(filtro)
 
-    if search:
-        filtro = f"%{search}%"
-        query = query.filter(
-            or_(
-                Duenio.nombre.ilike(filtro),
-                Duenio.paterno.ilike(filtro),
-                Duenio.materno.ilike(filtro),
-                Duenio.ci.ilike(filtro),
-                Reunion.descripcion.ilike(filtro),
-            )
-        )
+    # Estadísticas del conjunto filtrado (sin el filtro de estado), en una consulta.
+    presentes, total, reuniones = query.with_entities(
+        func.sum(case((Asistencia.asistio.is_(True), 1), else_=0)),
+        func.count(Asistencia.id),
+        func.count(func.distinct(Asistencia.id_reunion)),
+    ).one()
+    presentes, total = int(presentes or 0), int(total or 0)
 
-    # Mostrar primero las asistencias de reuniones más recientes
-    asistencias_paginated = query.order_by(Reunion.fecha.desc(), Asistencia.id).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    if estado == "presente":
+        query = query.filter(Asistencia.asistio.is_(True))
+    elif estado == "ausente":
+        query = query.filter(Asistencia.asistio.is_(False))
+    else:
+        estado = ""
 
-    # Estadísticas globales (siempre sobre el conjunto filtrado si hay búsqueda)
-    total_asistencias = query.count()
-    total_presentes   = query.filter(Asistencia.asistio == True).count()
-    total_ausentes    = query.filter(Asistencia.asistio == False).count()
-    reuniones_unicas  = query.with_entities(Asistencia.id_reunion).distinct().count()
+    pag = paginar(query.order_by(*clausulas), page, per_page)
+    return asistencia_view.list_asistencias(pag, search, {
+        "total_asistencias": total,
+        "total_presentes": presentes,
+        "total_ausentes": total - presentes,
+        "reuniones_unicas": int(reuniones or 0),
+    }, reunion=reunion, estado=estado, orden=orden)
 
-    return asistencia_view.list_asistencias(asistencias_paginated, search, {
-        'total_asistencias': total_asistencias,
-        'total_presentes':   total_presentes,
-        'total_ausentes':    total_ausentes,
-        'reuniones_unicas':  reuniones_unicas,
-    })
-
-
-# ─────────────────────────── CREAR ───────────────────────────────────────────
 
 @asistencia_bp.route("/asistencias/create", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def create_asistencia():
-    """Crea o actualiza una asistencia manualmente."""
+    """Registra (o corrige) la asistencia de un propietario a una reunión."""
     if request.method == "POST":
-        duenio_id  = request.form.get("duenio_id",  type=int)
-        id_reunion = request.form.get("id_reunion",  type=int)
-        asistio    = 'asistio' in request.form
+        duenio = db.session.get(Duenio, request.form.get("duenio_id", type=int) or 0)
+        reunion = db.session.get(Reunion, request.form.get("id_reunion", type=int) or 0)
+        asistio = _leer_asistio(request.form.get("asistio"))
+        if not duenio or not reunion:
+            flash("Elige un propietario y una reunión de las sugerencias.", "error")
+            return asistencia_view.create_asistencia(reunion=reunion)
 
-        if not duenio_id or not id_reunion:
-            flash("Propietario y reunión son obligatorios.", "error")
-        else:
-            reunion = db.session.get(Reunion, id_reunion)
-            asistencia_existente = Asistencia.query.filter_by(
-                duenio_id=duenio_id, id_reunion=id_reunion
-            ).first()
+        try:
+            asistencia = Asistencia.query.filter_by(duenio_id=duenio.id, id_reunion=reunion.id).first()
+            if asistencia is None:
+                asistencia = Asistencia(duenio_id=duenio.id, id_reunion=reunion.id)
+                db.session.add(asistencia)
+            con_multa = asistencia.marcar(asistio)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash("No se pudo guardar la asistencia. No se modificó nada.", "error")
+            return asistencia_view.create_asistencia(reunion=reunion)
 
-            if asistencia_existente:
-                asistencia_existente.update(asistio=asistio)
-                _gestionar_multa_asistencia(asistencia_existente, asistio, reunion)
-                msg = "Asistencia actualizada: Presente." if asistio else "Asistencia actualizada: Ausente. Multa aplicada."
-                flash(msg, "success" if asistio else "warning")
-            else:
-                asistencia = Asistencia(duenio_id=duenio_id, id_reunion=id_reunion, asistio=asistio)
-                asistencia.save()
-                _gestionar_multa_asistencia(asistencia, asistio, reunion)
-                msg = "Asistencia registrada: Presente." if asistio else "Asistencia registrada: Ausente. Multa aplicada."
-                flash(msg, "success" if asistio else "warning")
+        flash(*_mensaje(asistio, con_multa))
+        return redirect(url_for("asistencia.list_asistencias", reunion_id=reunion.id))
 
-        return redirect(url_for("asistencia.list_asistencias"))
+    reunion = db.session.get(Reunion, request.args.get("reunion_id", type=int) or 0)
+    return asistencia_view.create_asistencia(reunion=reunion)
 
-    duenios   = Duenio.query.all()
-    reuniones = Reunion.query.all()
-    return asistencia_view.create_asistencia(duenios, reuniones)
-
-
-# ─────────────────────────── ACTUALIZAR ──────────────────────────────────────
 
 @asistencia_bp.route("/asistencias/<int:id>/update", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def update_asistencia(id):
-    """Actualiza el estado de asistencia y gestiona la multa correspondiente."""
     asistencia = db.session.get(Asistencia, id)
     if not asistencia:
-        flash("Asistencia no encontrada.", "error")
+        flash("Ese registro de asistencia ya no existe.", "error")
         return redirect(url_for("asistencia.list_asistencias"))
 
     if request.method == "POST":
-        asistio_valor = request.form.get("asistio", "")
-        asistio = asistio_valor in ('true', 'on') or 'asistio' in request.form
-
-        asistencia.update(asistio=asistio)
-        reunion = db.session.get(Reunion, asistencia.id_reunion)
-        _gestionar_multa_asistencia(asistencia, asistio, reunion)
-
-        flash("Asistencia actualizada exitosamente.", "success")
-        return redirect(url_for("asistencia.list_asistencias"))
+        asistio = _leer_asistio(request.form.get("asistio"))
+        try:
+            con_multa = asistencia.marcar(asistio)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash("No se pudo guardar la asistencia. No se modificó nada.", "error")
+            return asistencia_view.update_asistencia(asistencia)
+        flash(*_mensaje(asistio, con_multa))
+        return redirect(_destino(request.form.get("volver")))
 
     return asistencia_view.update_asistencia(asistencia)
 
-
-# ─────────────────────────── ELIMINAR ────────────────────────────────────────
 
 @asistencia_bp.route("/asistencias/<int:id>/delete", methods=["POST"])
 @login_required
 @role_required("admin")
 def delete_asistencia(id):
-    """Elimina una asistencia y su multa asociada si existe."""
     asistencia = Asistencia.get_by_id(id)
     if not asistencia:
-        flash("Asistencia no encontrada.", "error")
+        flash("Ese registro de asistencia ya no existe.", "error")
         return redirect(url_for("asistencia.list_asistencias"))
-
     try:
-        _eliminar_multa_asistencia(asistencia)
-        asistencia.delete()
-        flash("Asistencia eliminada exitosamente.", "success")
+        asistencia.eliminar()
+        db.session.commit()
+        flash("Registro de asistencia eliminado junto con su multa.", "success")
     except Exception:
         db.session.rollback()
-        flash("Error al eliminar la asistencia.", "error")
+        flash("No se pudo eliminar la asistencia. No se borró nada.", "error")
+    return redirect(_destino(request.form.get("volver")))
 
-    return redirect(url_for("asistencia.list_asistencias"))
-
-
-# ─────────────────────────── MARCAR ASISTENCIA ───────────────────────────────
 
 @asistencia_bp.route("/asistencias/marcar", methods=["POST"])
 @login_required
 @role_required("admin")
 def marcar_asistencia():
-    """Marca la asistencia de un propietario a una reunión (desde listado rápido)."""
-    duenio_id  = request.form.get("duenio_id",  type=int)
-    id_reunion = request.form.get("id_reunion",  type=int)
-    asistio    = request.form.get("asistio") == "true"
-
+    """Marca presente/ausente desde el listado (botón rápido de cada fila)."""
     asistencia = Asistencia.query.filter_by(
-        duenio_id=duenio_id, id_reunion=id_reunion
+        duenio_id=request.form.get("duenio_id", type=int),
+        id_reunion=request.form.get("id_reunion", type=int),
     ).first()
+    destino = _destino(request.form.get("volver"))
+    if not asistencia:
+        flash("Ese registro de asistencia ya no existe.", "error")
+        return redirect(destino)
 
-    if asistencia:
-        asistencia.update(asistio=asistio)
-        reunion = db.session.get(Reunion, asistencia.id_reunion)
-        _gestionar_multa_asistencia(asistencia, asistio, reunion)
-        flash("Asistencia marcada exitosamente.", "success")
-    else:
-        flash("Asistencia no encontrada.", "error")
-
-    return redirect(url_for("asistencia.list_asistencias"))
-
-
-# ─────────────────────── FUNCIONES AUXILIARES PRIVADAS ───────────────────────
-# Prefijo _ para indicar que son de uso interno (no se importan desde otros módulos).
-
-def _crear_multa_asistencia(asistencia, monto_multa):
-    """Crea una multa por inasistencia si no existe una previa para esa reunión."""
-    # Consultar el propietario una sola vez y usar su propiedad de inmunidad
-    duenio = db.session.get(Duenio, asistencia.duenio_id)
-    if duenio and duenio.es_immune:
-        return  # Entidad con inmunidad — no se aplica multa
-
-    multa_existente = Multa.query.filter_by(
-        duenio_id=asistencia.duenio_id,
-        reunion_id=asistencia.id_reunion,
-        tipo='asistencia',
-    ).first()
-
-    if not multa_existente:
-        try:
-            multa = Multa(
-                duenio_id=asistencia.duenio_id,
-                reunion_id=asistencia.id_reunion,
-                monto=monto_multa,
-                tipo='asistencia',
-                descripcion=f'Multa por no asistir a reunión {asistencia.id_reunion}',
-            )
-            multa.save()
-        except Exception as e:
-            db.session.rollback()
-            raise e
-
-
-def _gestionar_multa_asistencia(asistencia, asistio, reunion):
-    """
-    Sincroniza la multa según el estado de asistencia:
-    - Asistió  → elimina multa existente si la hay.
-    - No asistió → crea multa si no existe y la reunión tiene monto > 0.
-    """
-    multa = Multa.query.filter_by(
-        duenio_id=asistencia.duenio_id,
-        reunion_id=asistencia.id_reunion,
-        tipo='asistencia',
-    ).first()
-
-    if asistio and multa:
-        multa.delete()
-    elif not asistio and not multa and reunion and reunion.monto_multa > 0:
-        _crear_multa_asistencia(asistencia, reunion.monto_multa)
-
-
-def _eliminar_multa_asistencia(asistencia):
-    """Elimina la multa de asistencia asociada si existe."""
-    multa = Multa.query.filter_by(
-        duenio_id=asistencia.duenio_id,
-        reunion_id=asistencia.id_reunion,
-        tipo='asistencia',
-    ).first()
-    if multa:
-        multa.delete()
+    asistio = _leer_asistio(request.form.get("asistio"))
+    try:
+        con_multa = asistencia.marcar(asistio)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("No se pudo guardar la asistencia. No se modificó nada.", "error")
+        return redirect(destino)
+    flash(*_mensaje(asistio, con_multa))
+    return redirect(destino)

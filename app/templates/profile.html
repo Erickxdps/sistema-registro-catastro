@@ -1,53 +1,30 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Perfil · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 600px; margin: 0 auto;">
-    {% call page_header('Perfil de usuario', 'Detalle de la cuenta activa', 'fa-user-circle') %}{% endcall %}
+{% call cabecera(user.username, 'Perfil de la cuenta.') %}
+    {% if current_user.has_role('admin') %}<a class="boton" href="{{ url_for('user.update_user', id=user.id) }}">{{ icono('edit') }}Cambiar rol o contraseña</a>{% endif %}
+{% endcall %}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <div class="d-flex align-items-center gap-3 mb-4">
-            <div class="avatar" style="width:64px; height:64px; font-size:1.4rem; border-radius: 50%; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); display: grid; place-items: center; font-weight: 700;">
-                {{ (user.username or '?')[:2]|upper }}
-            </div>
-            <div>
-                <h2 class="h5 fw-bold mb-1">{{ user.username }}</h2>
-                {% if user.role == 'admin' %}
-                <span class="chip tone-danger"><i class="fas fa-shield-alt me-1"></i>Administrador del Sistema</span>
-                {% else %}
-                <span class="chip tone-info"><i class="fas fa-user me-1"></i>Rol: {{ user.role }}</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="p-3 rounded mb-4" style="background: var(--surface-2); border: 1px solid var(--border);">
-            <div class="row g-2">
-                <div class="col-sm-4 text-muted small">ID de usuario</div>
-                <div class="col-sm-8 fw-semibold font-monospace">#{{ user.id }}</div>
-                <div class="col-sm-4 text-muted small">Nombre de usuario</div>
-                <div class="col-sm-8 fw-semibold">{{ user.username }}</div>
-                <div class="col-sm-4 text-muted small">Rol asignado</div>
-                <div class="col-sm-8 fw-semibold">{{ user.role }}</div>
-            </div>
-        </div>
-
-        <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-            <a href="{{ url_for('user.index') }}" class="text-decoration-none">
-                <md-text-button type="button">Volver al inicio</md-text-button>
-            </a>
-            {% if current_user.has_role('admin') %}
-            <a href="{{ url_for('user.update_user', id=user.id) }}" class="text-decoration-none">
-                <md-filled-button type="button">
-                    <md-icon slot="icon" class="material-symbols-outlined">edit</md-icon>
-                    Editar cuenta
-                </md-filled-button>
-            </a>
-            {% endif %}
-        </div>
+<div class="hoja">
+    <div class="ficha">
+        <div><span>Usuario</span><strong>{{ user.username }}</strong></div>
+        <div><span>Permisos</span><strong>{{ 'Administración' if user.role == 'admin' else 'Consulta' if user.role == 'doctor' else 'Rol no válido: ' ~ user.role }}</strong></div>
+        <div><span>Puede</span><strong>{{ 'Registrar, editar y eliminar' if user.role == 'admin' else 'Ver la información' }}</strong></div>
     </div>
 </div>
+
+{% if user.id == current_user.id %}
+<div class="hoja" style="margin-top: 28px">
+    <div class="hoja-cuerpo">
+        <h2>Accesos rápidos</h2>
+        <ul class="lista-simple" style="margin-top: 8px">
+            <li><a href="{{ url_for('user.index') }}">Inicio y plano de manzanos</a></li>
+            <li><a href="{{ url_for('duenio.list_duenios') }}">Propietarios</a></li>
+            <li><a href="{{ url_for('cuota.list_cuotas', estado='pendiente') }}">Cuotas pendientes</a></li>
+            <li><a href="{{ url_for('reporte.index') }}">Reportes y exportaciones</a></li>
+        </ul>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

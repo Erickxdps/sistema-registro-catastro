@@ -1,141 +1,61 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, initials, empty_state, pagination %}
-
-{% block title %}Terrenos · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar, persona %}
 
 {% block content %}
-{% call page_header('Terrenos', 'Lotes registrados y sus propietarios asociados', 'fa-map-marked-alt') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('terreno.create_terreno') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">add_location_alt</md-icon>
-            Nuevo terreno
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set es_admin = current_user.has_role('admin') %}
+{% call cabecera('Terrenos', 'Lotes del padrón por manzano, con su superficie y su propietario.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('terreno.create_terreno') }}">{{ icono('add_location_alt') }}Registrar terreno</a>{% endif %}
 {% endcall %}
 
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
+<div class="hoja">
+    {% call filtros(conservar=('orden', 'per_page', 'manzano')) %}
+        {{ buscador('buscar-terrenos', url_for('busqueda.buscar_terrenos'), 'Buscar terreno', valor=search,
+                    placeholder='Lote, manzano o propietario', etiqueta_visible=False) }}
+        {% if manzano is not none %}<a class="filtro-activo" href="{{ url_con(manzano=None, page=None) }}">Manzano {{ manzano }} {{ icono('close') }}<span class="sr-only">Quitar filtro de manzano</span></a>{% endif %}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    {% endcall %}
 
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <form method="GET" action="{{ url_for('terreno.list_terrenos') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" name="search" class="form-control border-start-0" placeholder="Lugar, manzano o propietario..." value="{{ search or '' }}">
-            </div>
-            <md-filled-button type="submit">Buscar</md-filled-button>
-            {% if search %}
-            <a href="{{ url_for('terreno.list_terrenos') }}" class="text-decoration-none">
-                <md-outlined-button type="button">Limpiar</md-outlined-button>
-            </a>
-            {% endif %}
-        </form>
-        {% if terrenos_paginated and terrenos_paginated.total > 0 %}
-        <span class="text-muted small">
-            {{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + 1 }}–{{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + terrenos|length }}
-            de {{ terrenos_paginated.total }} terrenos
-        </span>
-        {% endif %}
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="terrenosTable">
+    {% if terrenos_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">ID</th>
-                    <th>Propietario</th>
-                    <th>Lote</th>
-                    <th>Manzano</th>
-                    <th>Superficie</th>
-                    <th>Cuotas</th>
-                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                    {{ th_orden('Lote', 'lote', orden) }}
+                    {{ th_orden('Manzano', 'manzano', orden, 'derecha') }}
+                    {{ th_orden('Superficie', 'superficie', orden, 'derecha') }}
+                    {{ th_orden('Propietario', 'propietario', orden) }}
+                    {% if es_admin %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% for terreno in terrenos %}
+            {% for t in terrenos_paginated.items %}
                 <tr>
-                    <td class="text-muted num ps-3">#{{ terreno.id }}</td>
-                    <td>
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(terreno.dueno.nombre, terreno.dueno.paterno) if terreno.dueno else '?' }}
-                            </div>
-                            <div>
-                                <div class="person-name fw-medium">
-                                    {% if terreno.dueno %}
-                                    {{ terreno.dueno.nombre }} {{ terreno.dueno.paterno or '' }} {{ terreno.dueno.materno or '' }}
-                                    {% else %}
-                                    <span class="text-danger">Sin propietario asignado</span>
-                                    {% endif %}
-                                </div>
-                                <div class="person-meta small text-muted">CI: {{ terreno.dueno.ci if terreno.dueno else '—' }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td><span class="chip tone-info"><i class="fas fa-map-marker-alt me-1"></i>{{ terreno.lugar }}</span></td>
-                    <td><span class="chip tone-warning"><i class="fas fa-th me-1"></i>Mz. {{ terreno.manzano }}</span></td>
-                    <td class="num">{{ terreno.metros_cuadrados }} m²</td>
-                    <td>
-                        {% set cuotas = terreno.cuotas %}
-                        {% if cuotas %}
-                        <span class="chip tone-success"><i class="fas fa-receipt me-1"></i>{{ cuotas|length }} cuota{{ 's' if cuotas|length != 1 }}</span>
-                        {% else %}
-                        <span class="chip text-muted">Sin cuotas</span>
-                        {% endif %}
-                    </td>
-                    {% if current_user.has_role('admin') %}
-                    <td class="pe-3">
-                        <div class="row-actions justify-content-end gap-1">
-                            <a href="{{ url_for('terreno.update_terreno', id=terreno.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-                            </a>
-                            <form method="post" action="{{ url_for('terreno.delete_terreno', id=terreno.id) }}"
-                                  data-confirm="¿Eliminar definitivamente el terreno {{ terreno.lugar }} - Manzano {{ terreno.manzano }}?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
-                                </button>
-                            </form>
-                        </div>
+                    <td class="celda-titulo"><span class="celda-principal">Lote {{ t.lugar }}</span></td>
+                    <td data-label="Manzano" class="derecha num"><a href="{{ url_con(manzano=t.manzano, page=None) }}">{{ t.manzano }}</a></td>
+                    <td data-label="Superficie" class="derecha num">{{ t.metros_cuadrados|bs }} m²</td>
+                    <td data-label="Propietario">{{ persona(t.dueno, url_for('reporte.estado_cuenta_imprimible', duenio_id=t.duenio_id), 'CI ' ~ t.dueno.ci if t.dueno else '') }}</td>
+                    {% if es_admin %}
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones para el lote ' ~ t.lugar) %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('terreno.update_terreno', id=t.id) }}">{{ icono('edit') }}Editar o cambiar propietario</a>
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('terreno.delete_terreno', id=t.id),
+                                           'Se eliminará el lote ' ~ t.lugar ~ ' del manzano ' ~ t.manzano ~ ' junto con sus cuotas. No se puede deshacer.',
+                                           titulo='¿Eliminar este terreno?') }}
+                        {% endcall %}
                     </td>
                     {% endif %}
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7">
-                        {% if search %}
-                            {% call empty_state('fa-search', 'Sin resultados', 'No hay terrenos que coincidan con "' ~ search ~ '"') %}
-                                <a href="{{ url_for('terreno.list_terrenos') }}" class="btn btn-light btn-sm">Ver todos</a>
-                            {% endcall %}
-                        {% else %}
-                            {% call empty_state('fa-inbox', 'Aún no hay terrenos registrados', 'Registra el primer lote en el sistema.') %}
-                                {% if current_user.has_role('admin') %}
-                                <a href="{{ url_for('terreno.create_terreno') }}" class="btn btn-primary btn-sm">Registrar terreno</a>
-                                {% endif %}
-                            {% endcall %}
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
-
-    {% if terrenos_paginated and terrenos_paginated.pages > 1 %}
-    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
-        <form method="GET" action="{{ url_for('terreno.list_terrenos') }}" class="d-flex align-items-center gap-2">
-            <input type="hidden" name="search" value="{{ search or '' }}">
-            <span class="small text-muted">Mostrar</span>
-            <select name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
-                {% for n in [10, 25, 50, 100] %}
-                <option value="{{ n }}" {% if request.args.get('per_page', '10') == n|string %}selected{% endif %}>{{ n }}</option>
-                {% endfor %}
-            </select>
-            <span class="small text-muted">por página</span>
-        </form>
-        {{ pagination(terrenos_paginated, 'terreno.list_terrenos', search=search) }}
-    </div>
+    {{ paginacion(terrenos_paginated, 'terrenos') }}
+    {% elif search or manzano is not none %}
+    {{ vacio('Ningún terreno coincide con el filtro', 'Prueba con otro lote, otro manzano o parte del nombre del propietario.', url_for('terreno.list_terrenos'), 'Ver todos los terrenos', 'list') }}
+    {% else %}
+    {{ vacio('Todavía no hay terrenos', 'Registra un terreno y asígnalo a un propietario.',
+             url_for('terreno.create_terreno') if es_admin else None, 'Registrar terreno', 'add_location_alt') }}
     {% endif %}
 </div>
 {% endblock %}

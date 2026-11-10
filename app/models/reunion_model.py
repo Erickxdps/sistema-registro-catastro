@@ -1,5 +1,6 @@
+# models/reunion_model.py
 from database import db
-from datetime import date, time
+
 
 class Reunion(db.Model):
     __tablename__ = "Reunion"
@@ -7,7 +8,7 @@ class Reunion(db.Model):
     fecha = db.Column(db.Date, nullable=False)
     hora = db.Column(db.Time, nullable=False)
     descripcion = db.Column(db.String(255), nullable=True)
-    monto_multa = db.Column(db.Float, nullable=False, default=100.0)  # ✅ NUEVO ATRIBUTO
+    monto_multa = db.Column(db.Float, nullable=False, default=100.0)
 
     def __init__(self, fecha, hora, descripcion=None, monto_multa=100.0):
         self.fecha = fecha
@@ -21,11 +22,11 @@ class Reunion(db.Model):
 
     @staticmethod
     def get_all():
-        return Reunion.query.all()
+        return Reunion.query.order_by(Reunion.fecha.desc(), Reunion.id.desc()).all()
 
     @staticmethod
     def get_by_id(id):
-        return Reunion.query.get(id)
+        return db.session.get(Reunion, id)
 
     def update(self, fecha=None, hora=None, descripcion=None, monto_multa=None):
         if fecha is not None:
@@ -38,26 +39,44 @@ class Reunion(db.Model):
             self.monto_multa = monto_multa
         db.session.commit()
 
-    def delete(self):
-        # Eliminar registros relacionados manualmente para evitar errores de foreign key
+    # ── Operaciones de negocio (no hacen commit) ──────────────────────────────
+    @staticmethod
+    def crear_con_asistencias(fecha, hora, descripcion, monto_multa):
+        """Crea la reunión, una asistencia (ausente) por propietario y la multa
+        inicial de inasistencia para los no inmunes. Todo en una transacción."""
+        from models.asistencia_model import Asistencia
+        from models.duenio_model import Duenio
+        from models.multa_model import Multa
+
+        reunion = Reunion(fecha=fecha, hora=hora, descripcion=descripcion, monto_multa=monto_multa)
+        db.session.add(reunion)
+        db.session.flush()
+
+        duenios = Duenio.query.order_by(Duenio.id).all()
+        for duenio in duenios:
+            db.session.add(Asistencia(duenio_id=duenio.id, id_reunion=reunion.id))
+            if monto_multa > 0 and not duenio.es_immune:
+                db.session.add(Multa(
+                    duenio_id=duenio.id, reunion_id=reunion.id, monto=monto_multa, tipo='asistencia',
+                    descripcion=f'Multa por no asistir a reunión {reunion.id}',
+                ))
+        return reunion, len(duenios)
+
+    def eliminar(self):
+        """Regla única de borrado: al eliminar una reunión se eliminan sus
+        asistencias y sus multas de inasistencia. Devuelve (multas, asistencias)."""
         from models.asistencia_model import Asistencia
         from models.multa_model import Multa
-        
+
+        multas = Multa.query.filter_by(reunion_id=self.id).delete(synchronize_session=False)
+        asistencias = Asistencia.query.filter_by(id_reunion=self.id).delete(synchronize_session=False)
+        db.session.delete(self)
+        return multas, asistencias
+
+    def delete(self):
         try:
-            # 1. Eliminar todas las asistencias de esta reunión
-            asistencias = Asistencia.query.filter_by(id_reunion=self.id).all()
-            for asistencia in asistencias:
-                db.session.delete(asistencia)
-            
-            # 2. Desvincular multas relacionadas con esta reunión (SET NULL)
-            multas = Multa.query.filter_by(reunion_id=self.id).all()
-            for multa in multas:
-                multa.reunion_id = None
-            
-            # 3. Finalmente eliminar la reunión
-            db.session.delete(self)
+            self.eliminar()
             db.session.commit()
-            
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise

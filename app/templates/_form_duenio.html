@@ -1,0 +1,22 @@
+{# Campos del propietario. Espera `v` (valores actuales o del envío fallido). #}
+<div class="campos">
+    <div class="campo campo-ancho">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" name="nombre" type="text" required minlength="2" maxlength="50" autocomplete="off"
+               value="{{ v.nombre or '' }}" placeholder="Ej.: María Elena">
+    </div>
+    <div class="campo">
+        <label for="paterno">Apellido paterno <span class="opcional">(opcional)</span></label>
+        <input id="paterno" name="paterno" type="text" maxlength="50" autocomplete="off" value="{{ v.paterno or '' }}">
+    </div>
+    <div class="campo">
+        <label for="materno">Apellido materno <span class="opcional">(opcional)</span></label>
+        <input id="materno" name="materno" type="text" maxlength="50" autocomplete="off" value="{{ v.materno or '' }}">
+    </div>
+    <div class="campo">
+        <label for="ci">Cédula de identidad (CI)</label>
+        <input id="ci" name="ci" type="text" required minlength="3" maxlength="20" pattern="[A-Za-z0-9.\-]+" autocomplete="off"
+               value="{{ v.ci or '' }}" placeholder="Ej.: 4567890 o 4567890-1A" aria-describedby="ci-ayuda">
+        <p class="ayuda" id="ci-ayuda">Números y letras; se permiten guiones y puntos. No puede repetirse.</p>
+    </div>
+</div>

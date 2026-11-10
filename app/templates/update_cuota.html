@@ -1,98 +1,47 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Editar cuota · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario, buscador %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Editar cuota #' ~ cuota.cuota_id, '', 'fa-money-bill') %}{% endcall %}
+{% set t = cuota.terreno %}
+{{ cabecera('Editar cuota', cuota.titulo, volver=url_for('cuota.list_cuotas', titulo=cuota.titulo), volver_texto='Cuotas') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="updateCuotaForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Título"
-                    id="titulo"
-                    name="titulo"
-                    value="{{ cuota.titulo }}"
-                    placeholder="Cuota mensual, Mantenimiento…"
-                    required
-                    autofocus>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">title</md-icon>
-                </md-outlined-text-field>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        <div class="campos">
+            <div class="campo campo-ancho">
+                <label for="titulo">Título</label>
+                <input id="titulo" name="titulo" type="text" required minlength="3" maxlength="150" value="{{ cuota.titulo }}">
             </div>
-
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Descripción detallada (opcional)"
-                    id="descripcion"
-                    name="descripcion"
-                    type="textarea"
-                    rows="3"
-                    value="{{ cuota.descripcion if cuota.descripcion else '' }}">
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">notes</md-icon>
-                </md-outlined-text-field>
+            <div class="campo-ancho">
+                {{ buscador('buscar-terreno', url_for('busqueda.buscar_terrenos'), 'Terreno', nombre='terreno_id', modo='seleccion',
+                            valor=t.id if t else '', texto=('Lote ' ~ t.lugar ~ ', manzano ' ~ t.manzano) if t else '',
+                            detalle=t.dueno.nombre_completo if t and t.dueno else '',
+                            placeholder='Lote, manzano o propietario', requerido=True,
+                            mensaje_requerido='Elige un terreno de la lista de sugerencias.') }}
             </div>
-
-            <div class="mb-3">
-                <label for="terreno_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">map</span>
-                    Terreno asociado
-                </label>
-                <input type="text" class="form-control mb-2" data-filter-for="terreno_id" placeholder="Filtrar por lote, manzana o propietario..." autocomplete="off">
-                <select id="terreno_id" name="terreno_id" required class="form-select">
-                    {% for terreno in terrenos %}
-                    <option value="{{ terreno.id }}" {% if terreno.id == cuota.terreno_id %}selected{% endif %}>
-                        Lote {{ terreno.lugar }} · Mz. {{ terreno.manzano }} ({{ terreno.dueno.nombre }} {{ terreno.dueno.paterno }} · CI {{ terreno.dueno.ci }})
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Monto (Bs.)"
-                    id="monto"
-                    name="monto"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value="{{ cuota.monto }}"
-                    required>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="p-3 rounded mb-3" style="background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem;">
-                <md-checkbox id="pagado" name="pagado" value="on" touch-target="wrapper" {% if cuota.pagado %}checked{% endif %}></md-checkbox>
-                <label for="pagado" class="mb-0 user-select-none" style="cursor: pointer;">
-                    <div class="fw-semibold">Marcar como pagada</div>
-                    <div class="text-muted small">Al marcarla como pagada se regulariza el estado de cuenta del propietario.</div>
-                </label>
-            </div>
-
-            <div class="d-flex flex-wrap gap-4 text-muted small mb-4">
-                <div>
-                    Estado actual:
-                    {% if cuota.pagado %}<span class="chip tone-success"><i class="fas fa-check-circle"></i>Pagada</span>
-                    {% else %}<span class="chip tone-warning"><i class="fas fa-clock"></i>Pendiente</span>{% endif %}
+            <div class="campo">
+                <label for="monto">Monto</label>
+                <div class="con-prefijo">
+                    <span>Bs</span>
+                    <input id="monto" name="monto" type="number" required min="0.5" step="0.5" inputmode="decimal" value="{{ cuota.monto }}">
                 </div>
-                <div>Creada el <strong class="text-body">{{ cuota.fecha_creacion.strftime('%d/%m/%Y') if cuota.fecha_creacion else 'N/A' }}</strong></div>
             </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('cuota.list_cuotas') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Actualizar cuota
-                </md-filled-button>
+            <div class="campo">
+                <span class="campo-etiqueta" id="etiqueta-pago">Estado</span>
+                <div class="alternador" role="radiogroup" aria-labelledby="etiqueta-pago">
+                    <input type="radio" id="pago-no" name="pagado" value="off"{% if not cuota.pagado %} checked{% endif %}>
+                    <label for="pago-no" class="op-pend">Pendiente</label>
+                    <input type="radio" id="pago-si" name="pagado" value="on"{% if cuota.pagado %} checked{% endif %}>
+                    <label for="pago-si" class="op-ok">Pagada</label>
+                </div>
             </div>
-        </form>
+            <div class="campo campo-ancho">
+                <label for="descripcion">Descripción <span class="opcional">(opcional)</span></label>
+                <textarea id="descripcion" name="descripcion" maxlength="500">{{ cuota.descripcion or '' }}</textarea>
+            </div>
+        </div>
     </div>
-</div>
+    {{ pie_formulario(url_for('cuota.list_cuotas', titulo=cuota.titulo), 'Guardar cambios') }}
+</form>
 {% endblock %}

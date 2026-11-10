@@ -1,29 +1,21 @@
 from flask import render_template
-from flask_login import current_user
 
-def usuarios(users):
-    return render_template(
-        "usuarios.html",
-        users=users,
-        title="Lista de usuarios",
-        current_user=current_user,
-    )
+
+def usuarios(users, search="", orden="usuario"):
+    return render_template("usuarios.html", users=users, search=search, orden=orden, title="Usuarios")
+
+
 def registro():
-    return render_template(
-        "registro.html", title="Registro de usuarios", current_user=current_user
-    )
+    return render_template("registro.html", title="Nuevo usuario")
+
+
 def actualizar(user):
-    return render_template(
-        "actualizar.html",
-        title="Actualizar usuario",
-        user=user,
-        current_user=current_user,
-    )
+    return render_template("actualizar.html", title="Editar usuario", user=user)
+
+
 def login():
-    return render_template(
-        "login.html", title="Inicio de sesión", current_user=current_user
-    )
+    return render_template("login.html", title="Iniciar sesión")
+
+
 def perfil(user):
-    return render_template(
-        "profile.html", title="Perfil de usuario", current_user=current_user, user=user
-    )
+    return render_template("profile.html", title="Perfil", user=user)

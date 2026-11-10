@@ -1,75 +1,15 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Nuevo propietario · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Nuevo propietario', 'Registra a una persona en el sistema con Material Design 3', 'fa-user-plus') %}{% endcall %}
+{{ cabecera('Registrar propietario', 'Después podrás asignarle terrenos.', volver=url_for('duenio.list_duenios'), volver_texto='Propietarios') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="createDuenioForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-                <md-outlined-text-field
-                    label="Nombre"
-                    id="nombre"
-                    name="nombre"
-                    placeholder="Ej. Juan Carlos"
-                    required
-                    autofocus>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">person</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Apellido paterno"
-                        id="paterno"
-                        name="paterno"
-                        placeholder="Ej. García"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">badge</md-icon>
-                    </md-outlined-text-field>
-                </div>
-                <div class="col-md-6">
-                    <md-outlined-text-field
-                        label="Apellido materno"
-                        id="materno"
-                        name="materno"
-                        placeholder="Ej. López"
-                        required>
-                        <md-icon slot="leading-icon" class="material-symbols-outlined">badge</md-icon>
-                    </md-outlined-text-field>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <md-outlined-text-field
-                    label="Cédula de identidad (CI)"
-                    id="ci"
-                    name="ci"
-                    type="text"
-                    placeholder="12345678"
-                    supporting-text="Solo números, sin guiones ni puntos"
-                    required>
-                    <md-icon slot="leading-icon" class="material-symbols-outlined">fingerprint</md-icon>
-                </md-outlined-text-field>
-            </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('duenio.list_duenios') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Registrar propietario
-                </md-filled-button>
-            </div>
-        </form>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="hoja-cuerpo">
+        {% set v = form %}
+        {% include '_form_duenio.html' %}
     </div>
-</div>
+    {{ pie_formulario(url_for('duenio.list_duenios'), 'Registrar propietario', 'person_add') }}
+</form>
 {% endblock %}

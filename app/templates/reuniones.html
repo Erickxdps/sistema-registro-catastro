@@ -1,180 +1,77 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, empty_state %}
-
-{% block title %}Reuniones · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones %}
 
 {% block content %}
-{% call page_header('Reuniones', 'Reuniones programadas, asambleas y convocatorias', 'fa-calendar-alt') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('reunion.create_reunion') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">add_circle</md-icon>
-            Nueva reunión
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set autenticado = current_user.is_authenticated %}
+{% set es_admin = current_user.has_role('admin') %}
+{% call cabecera('Reuniones', 'Asambleas convocadas por la junta y la asistencia registrada en cada una.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('reunion.create_reunion') }}">{{ icono('event') }}Convocar reunión</a>{% endif %}
 {% endcall %}
 
-{% if reuniones %}
-{% set futuras = reuniones|selectattr('fecha', 'ge', today)|list|length if today is defined else 0 %}
-<div class="stats">
-    {{ stat('Reuniones registradas', reuniones|length, 'fa-calendar-check', 'info') }}
-    {{ stat('Próximas u hoy', futuras, 'fa-calendar-plus', 'success') }}
-    {{ stat('Realizadas', (reuniones|length - futuras) if (reuniones|length - futuras) >= 0 else reuniones|length, 'fa-calendar-minus', 'neutral') }}
-</div>
-{% endif %}
+<div class="hoja">
+    {% call filtros() %}
+        {{ buscador('buscar-reuniones', url_for('busqueda.buscar_reuniones'), 'Buscar reunión', valor=search,
+                    placeholder='Tema o fecha (AAAA-MM-DD)', etiqueta_visible=False) }}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    {% endcall %}
 
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="input-group" style="max-width: 380px;">
-            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Filtrar por tema, descripción o fecha...">
-        </div>
-        <span class="text-muted small" id="conteoFilas"></span>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="reunionesTable">
+    {% if reuniones_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">ID</th>
-                    <th>Descripción / Asunto</th>
-                    <th>Fecha y hora</th>
-                    <th>Multa inasistencia</th>
-                    <th>Estado</th>
-                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                    {{ th_orden('Fecha', 'fecha', orden) }}
+                    {{ th_orden('Tema', 'descripcion', orden) }}
+                    {{ th_orden('Multa por faltar', 'multa', orden, 'derecha') }}
+                    <th>Asistencia</th>
+                    {% if autenticado %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% for reunion in reuniones %}
-                <tr class="fila">
-                    <td class="text-muted num ps-3">#{{ reunion.id }}</td>
-                    <td class="fw-semibold">{{ reunion.descripcion }}</td>
-                    <td>
-                        <div class="num fw-medium">{{ reunion.fecha }}</div>
-                        <div class="small text-muted"><i class="fas fa-clock me-1"></i>{{ reunion.hora }}</div>
+            {% for r in reuniones_paginated.items %}
+                {% set c = conteos.get(r.id, (0, 0)) %}
+                {% set futura = hoy and r.fecha >= hoy %}
+                <tr>
+                    <td class="celda-titulo">
+                        <span class="celda-principal num">{{ r.fecha|fecha }}</span>
+                        <span class="celda-secundaria">{{ r.hora.strftime('%H:%M') }}{% if futura %}, próxima{% endif %}</span>
                     </td>
-                    <td class="num">
-                        {% if reunion.monto_multa and reunion.monto_multa > 0 %}
-                        <span class="chip tone-danger">Bs. {{ '%.2f'|format(reunion.monto_multa) }}</span>
-                        {% else %}
-                        <span class="chip text-muted">Sin multa</span>
-                        {% endif %}
+                    <td data-label="Tema">{{ r.descripcion or 'Sin tema registrado' }}</td>
+                    <td data-label="Multa por faltar" class="derecha num">{{ 'Bs ' ~ r.monto_multa|bs if r.monto_multa else 'Sin multa' }}</td>
+                    <td data-label="Asistencia">
+                        {% if futura and not c[0] %}<span class="estado estado-pend">Pendiente</span>
+                        {% elif c[1] %}<span class="estado estado-ok">{{ c[0] }} de {{ c[1] }} presentes</span>
+                        {% else %}<span class="estado estado-neutro">Sin lista</span>{% endif %}
                     </td>
-                    <td>
-                        {% if today is defined and reunion.fecha > today %}
-                        <span class="chip tone-success"><i class="fas fa-calendar-plus me-1"></i>Próxima</span>
-                        {% elif today is defined and reunion.fecha == today %}
-                        <span class="chip tone-warning"><i class="fas fa-calendar-day me-1"></i>Hoy</span>
-                        {% else %}
-                        <span class="chip"><i class="fas fa-calendar-check me-1"></i>Realizada</span>
-                        {% endif %}
-                    </td>
-                    {% if current_user.has_role('admin') %}
-                    <td class="pe-3">
-                        <div class="row-actions justify-content-end gap-1">
-                            <a href="{{ url_for('reunion.update_reunion', id=reunion.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-                            </a>
-                            <button type="button" class="btn btn-outline-danger btn-icon btn-sm btn-eliminar" title="Eliminar"
-                                    data-id="{{ reunion.id }}" data-descripcion="{{ reunion.descripcion or 'Sin descripción' }}">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
-                            </button>
-                        </div>
+                    {% if autenticado %}
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones para la reunión del ' ~ r.fecha|fecha) %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('asistencia.list_asistencias', reunion_id=r.id) }}">{{ icono('how_to_reg') }}Ver lista de asistencia</a>
+                            {% if es_admin %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('asistencia.create_asistencia', reunion_id=r.id) }}">{{ icono('person_check') }}Registrar asistencia</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('reunion.update_reunion', id=r.id) }}">{{ icono('edit') }}Editar reunión</a>
+                            <div class="menu-separador"></div>
+                            <button type="button" class="menu-item peligro" role="menuitem"
+                                    data-fetch="{{ url_for('reunion.delete_reunion_ajax') }}"
+                                    data-fetch-cuerpo='{{ {"reunion_id": r.id}|tojson }}'
+                                    data-confirm-titulo="¿Eliminar esta reunión?"
+                                    data-confirm="Se eliminará la reunión del {{ r.fecha|fecha }} con sus {{ c[1] }} registros de asistencia y sus multas por inasistencia. No se puede deshacer."
+                                    data-confirm-accion="Eliminar reunión">{{ icono('delete') }}Eliminar</button>
+                            {% endif %}
+                        {% endcall %}
                     </td>
                     {% endif %}
                 </tr>
-                {% else %}
-                <tr><td colspan="6">{{ empty_state('fa-calendar-alt', 'Sin reuniones', 'No hay reuniones registradas.') }}</td></tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
+    {{ paginacion(reuniones_paginated, 'reuniones') }}
+    {% elif search %}
+    {{ vacio('Ninguna reunión coincide con “' ~ search ~ '”', 'Busca por una palabra del tema o por fecha, por ejemplo 2026-03.', url_con(search=None, page=None), 'Ver todas', 'list') }}
+    {% else %}
+    {{ vacio('Todavía no hay reuniones', 'Al convocar una reunión se crea la lista de asistencia de todos los propietarios.',
+             url_for('reunion.create_reunion') if es_admin else None, 'Convocar reunión', 'event') }}
+    {% endif %}
 </div>
-
-<!-- Modal de progreso -->
-<div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center p-4">
-                <div class="spinner-border text-danger mb-3" role="status"></div>
-                <h6 class="mb-1 fw-bold">Eliminando reunión</h6>
-                <div class="text-muted small mb-3" id="progressTema"></div>
-                <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated bg-danger" style="width:100%"></div></div>
-                <div class="text-muted small mt-3">Se eliminan también las asistencias y multas generadas.</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal de resultado -->
-<div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="resultTitle"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body" id="resultBody"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    (function () {
-        var filtro = document.getElementById('filtroTabla');
-        var filas = document.querySelectorAll('.fila');
-        var conteo = document.getElementById('conteoFilas');
-        function actualizar() {
-            var q = (filtro.value || '').trim().toLowerCase(), n = 0;
-            filas.forEach(function (f) {
-                var ok = f.textContent.toLowerCase().indexOf(q) > -1;
-                f.style.display = ok ? '' : 'none';
-                if (ok) n++;
-            });
-            conteo.textContent = n + ' reunión' + (n !== 1 ? 'es' : '');
-        }
-        filtro.addEventListener('input', actualizar);
-        actualizar();
-
-        // Eliminación asíncrona optimizada
-        document.querySelectorAll('.btn-eliminar').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                var id = this.getAttribute('data-id');
-                var desc = this.getAttribute('data-descripcion');
-                if (!confirm('¿Seguro que deseas eliminar la reunión "' + desc + '" y todas sus asistencias asociadas?')) return;
-
-                var progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
-                document.getElementById('progressTema').textContent = desc;
-                progressModal.show();
-
-                try {
-                    var res = await fetch('/api/reuniones/delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reunion_id: parseInt(id, 10) })
-                    });
-                    var data = await res.json();
-                    progressModal.hide();
-
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert('Error: ' + (data.error || 'No se pudo eliminar'));
-                    }
-                } catch (e) {
-                    progressModal.hide();
-                    alert('Error de conexión: ' + e.message);
-                }
-            });
-        });
-    })();
-</script>
 {% endblock %}

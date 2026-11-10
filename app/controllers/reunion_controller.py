@@ -1,137 +1,158 @@
 # controllers/reunion_controller.py
-# Controlador de reuniones — refactorizado para:
-#   1. Usar duenio.es_immune en vez del import de es_dueno_inmune (eliminado).
-#   2. Eliminar if/else de autorización duplicados.
-#   3. Proteger el endpoint AJAX de eliminación con @login_required.
-#   4. Llamar _gestionar_multa_asistencia desde asistencia_controller
-#      o replicar la lógica necesaria localmente para no crear acoplamiento inverso.
+# Reuniones: listado público paginado y operaciones de administración.
 #
-# IMPORTANTE: nombres de rutas, Blueprint y columnas de BD sin cambios.
+# Reglas (definidas en Reunion): al crear una reunión se crea una asistencia
+# por propietario y la multa inicial de inasistencia; al eliminarla se borran
+# sus asistencias y multas. Todo en UNA transacción: si algo falla, no queda
+# ninguna reunión a medio crear.
+#
+# Contratos JSON conservados:
+#   POST /api/reuniones/create  → {success, message, reunion_id, total_procesados}
+#   POST /api/reuniones/delete  → {success, message, multas_eliminadas,
+#                                  asistencias_eliminadas, reunion_descripcion}
 
-from flask import Blueprint, request, redirect, url_for, flash, jsonify
-from flask_login import login_required
 from datetime import datetime
-from sqlalchemy import text
 
-from models.reunion_model    import Reunion
-from models.duenio_model     import Duenio
-from models.asistencia_model import Asistencia
-from models.multa_model      import Multa
-from views import reunion_view
-from utils.decorators import role_required
+from flask import Blueprint, flash, jsonify, redirect, request, url_for
+from flask_login import login_required
+from sqlalchemy import case, func
+
 from database import db
+from models.asistencia_model import Asistencia
+from models.reunion_model import Reunion
+from utils.busqueda import filtro_por_palabras
+from utils.decorators import role_required
+from utils.fechas import hoy
+from utils.pagination import obtener_orden, obtener_paginacion, paginar
+from views import reunion_view
 
 reunion_bp = Blueprint("reunion", __name__)
 
+ORDEN_REUNIONES = {
+    "-fecha": [Reunion.fecha.desc(), Reunion.hora.desc(), Reunion.id.desc()],
+    "fecha": [Reunion.fecha.asc(), Reunion.hora.asc(), Reunion.id.asc()],
+    "descripcion": [Reunion.descripcion.asc(), Reunion.id.asc()],
+    "-descripcion": [Reunion.descripcion.desc(), Reunion.id.desc()],
+    "multa": [Reunion.monto_multa.asc(), Reunion.id.asc()],
+    "-multa": [Reunion.monto_multa.desc(), Reunion.id.desc()],
+}
 
-# ─────────────────────────── LISTADO ─────────────────────────────────────────
+MONTO_MULTA_MAXIMO = 100_000
+
+
+def _validar(fecha_str, hora_str, descripcion, monto_raw, parcial=False):
+    """Valida los datos de una reunión. Devuelve (datos, error).
+    Con parcial=True, los campos vacíos se omiten (actualización)."""
+    datos = {}
+    try:
+        if fecha_str or not parcial:
+            datos["fecha"] = datetime.strptime((fecha_str or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None, "La fecha no es válida. Usa el selector de fecha."
+    try:
+        if hora_str or not parcial:
+            hora = (hora_str or "").strip()[:5]  # acepta HH:MM y HH:MM:SS
+            datos["hora"] = datetime.strptime(hora, "%H:%M").time()
+    except ValueError:
+        return None, "La hora no es válida. Usa el formato HH:MM."
+
+    if descripcion is not None:
+        descripcion = descripcion.strip()
+        if len(descripcion) > 255:
+            return None, "El tema no puede pasar de 255 caracteres."
+        datos["descripcion"] = descripcion
+
+    if monto_raw not in (None, "") or not parcial:
+        try:
+            monto = float(monto_raw if monto_raw not in (None, "") else 100.0)
+        except (TypeError, ValueError):
+            return None, "La multa por inasistencia debe ser un número."
+        if monto < 0 or monto > MONTO_MULTA_MAXIMO:
+            return None, "La multa por inasistencia debe estar entre 0 y 100.000 Bs."
+        datos["monto_multa"] = round(monto, 2)
+    return datos, None
+
+
+def _conteos_asistencia(ids):
+    """{reunion_id: (presentes, total)} en una sola consulta."""
+    if not ids:
+        return {}
+    filas = (db.session.query(Asistencia.id_reunion,
+                              func.sum(case((Asistencia.asistio.is_(True), 1), else_=0)),
+                              func.count(Asistencia.id))
+             .filter(Asistencia.id_reunion.in_(ids))
+             .group_by(Asistencia.id_reunion).all())
+    return {rid: (int(p or 0), int(t or 0)) for rid, p, t in filas}
+
+
+# ─────────────────────────── LISTADO (público) ───────────────────────────────
 
 @reunion_bp.route("/reuniones")
 def list_reuniones():
-    """Lista todas las reuniones. Acceso público (solo lectura)."""
-    reuniones = Reunion.get_all()
-    return reunion_view.list_reuniones(reuniones)
+    page, per_page, search = obtener_paginacion()
+    orden, clausulas = obtener_orden(ORDEN_REUNIONES, "-fecha")
+    query = Reunion.query
+    filtro = filtro_por_palabras(search, [Reunion.descripcion, Reunion.fecha])
+    if filtro is not None:
+        query = query.filter(filtro)
+    pag = paginar(query.order_by(*clausulas), page, per_page)
+    return reunion_view.list_reuniones(pag, search, orden,
+                                       conteos=_conteos_asistencia([r.id for r in pag.items]),
+                                       hoy=hoy())
 
 
 # ─────────────────────────── CREAR ───────────────────────────────────────────
+
+def _crear(datos):
+    reunion, total = Reunion.crear_con_asistencias(
+        datos["fecha"], datos["hora"], datos.get("descripcion") or None, datos["monto_multa"])
+    db.session.commit()
+    return reunion, total
+
 
 @reunion_bp.route("/reuniones/create", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def create_reunion():
-    """Crea una reunión y genera asistencias + multas para todos los propietarios."""
+    """Formulario clásico (sin JavaScript). La interfaz usa /api/reuniones/create."""
     if request.method == "POST":
-        fecha_str   = request.form.get("fecha", "")
-        hora_str    = request.form.get("hora",  "")
-        descripcion = request.form.get("descripcion")
-        monto_multa = request.form.get("monto_multa", 100.0, type=float)
-
-        try:
-            fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-            hora  = datetime.strptime(hora_str,  "%H:%M").time()
-        except ValueError:
-            flash("Formato de fecha u hora inválido.", "error")
+        datos, error = _validar(request.form.get("fecha"), request.form.get("hora"),
+                                request.form.get("descripcion", ""), request.form.get("monto_multa"))
+        if error:
+            flash(error, "error")
             return reunion_view.create_reunion()
-
-        reunion = Reunion(fecha=fecha, hora=hora, descripcion=descripcion, monto_multa=monto_multa)
-        reunion.save()
-
-        # Crear asistencias y multas para todos los propietarios
-        duenios = Duenio.query.all()
-        for duenio in duenios:
-            asistencia = Asistencia(duenio_id=duenio.id, id_reunion=reunion.id)
-            asistencia.save()
-
-            # Aplicar multa inicial por inasistencia (se elimina si luego asiste)
-            if monto_multa > 0 and not duenio.es_immune:
-                multa = Multa(
-                    duenio_id=duenio.id,
-                    reunion_id=reunion.id,
-                    monto=monto_multa,
-                    tipo='asistencia',
-                    descripcion=f'Multa por no asistir a reunión {reunion.id}',
-                )
-                multa.save()
-
-        flash("Reunión creada exitosamente.", "success")
+        try:
+            _, total = _crear(datos)
+        except Exception:
+            db.session.rollback()
+            flash("No se pudo crear la reunión. No se guardó nada.", "error")
+            return reunion_view.create_reunion()
+        flash(f"Reunión creada. Se registró la lista de {total} propietarios.", "success")
         return redirect(url_for("reunion.list_reuniones"))
 
     return reunion_view.create_reunion()
 
 
-# ─────────────────── CREAR (ENDPOINT AJAX con procesamiento por lotes) ───────
-
 @reunion_bp.route("/api/reuniones/create", methods=["POST"])
 @login_required
 @role_required("admin")
 def create_reunion_ajax():
-    """
-    Crea una reunión procesando propietarios en lotes de 50
-    para evitar timeouts con grandes volúmenes de datos.
-    """
+    data = request.get_json(silent=True) or {}
+    datos, error = _validar(data.get("fecha"), data.get("hora"), data.get("descripcion", ""),
+                            data.get("monto_multa", 100.0))
+    if error:
+        return jsonify({"success": False, "error": error}), 400
     try:
-        data        = request.get_json()
-        fecha_str   = data["fecha"]
-        hora_str    = data["hora"]
-        descripcion = data.get("descripcion", "")
-        monto_multa = float(data.get("monto_multa", 100.0))
-
-        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        hora  = datetime.strptime(hora_str,  "%H:%M").time()
-
-        reunion = Reunion(fecha=fecha, hora=hora, descripcion=descripcion, monto_multa=monto_multa)
-        reunion.save()
-
-        duenios      = Duenio.query.all()
-        lote_size    = 50
-        procesados   = 0
-
-        for i in range(0, len(duenios), lote_size):
-            for duenio in duenios[i:i + lote_size]:
-                db.session.add(Asistencia(duenio_id=duenio.id, id_reunion=reunion.id))
-
-                if monto_multa > 0 and not duenio.es_immune:
-                    db.session.add(Multa(
-                        duenio_id=duenio.id,
-                        reunion_id=reunion.id,
-                        monto=monto_multa,
-                        tipo='asistencia',
-                        descripcion=f'Multa por no asistir a reunión {reunion.id}',
-                    ))
-                procesados += 1
-
-            db.session.commit()  # Commit por lote para liberar memoria
-
-        return jsonify({
-            "success": True,
-            "message": f"Reunión creada. Se procesaron {procesados} propietarios.",
-            "reunion_id": reunion.id,
-            "total_procesados": procesados,
-        })
-
-    except Exception as e:
+        reunion, total = _crear(datos)
+    except Exception:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "No se pudo crear la reunión. No se guardó nada."}), 500
+    return jsonify({
+        "success": True,
+        "message": f"Reunión creada. Se procesaron {total} propietarios.",
+        "reunion_id": reunion.id,
+        "total_procesados": total,
+    })
 
 
 # ─────────────────────────── ACTUALIZAR ──────────────────────────────────────
@@ -140,103 +161,70 @@ def create_reunion_ajax():
 @login_required
 @role_required("admin")
 def update_reunion(id):
-    """Actualiza los datos de una reunión."""
     reunion = Reunion.get_by_id(id)
     if not reunion:
-        flash("Reunión no encontrada.", "error")
+        flash("Esa reunión ya no existe.", "error")
         return redirect(url_for("reunion.list_reuniones"))
 
     if request.method == "POST":
-        fecha_str   = request.form.get("fecha")
-        hora_str    = request.form.get("hora")
-        descripcion = request.form.get("descripcion")
-        monto_multa = request.form.get("monto_multa", type=float)
-
-        # Construir kwargs solo con los campos presentes para update() parcial
-        kwargs = {}
-        if fecha_str:
-            kwargs['fecha'] = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        if hora_str:
-            kwargs['hora'] = datetime.strptime(hora_str, "%H:%M").time()
-        if descripcion is not None:
-            kwargs['descripcion'] = descripcion
-        if monto_multa is not None:
-            kwargs['monto_multa'] = monto_multa
-
-        reunion.update(**kwargs)
-        flash("Reunión actualizada exitosamente.", "success")
+        datos, error = _validar(request.form.get("fecha"), request.form.get("hora"),
+                                request.form.get("descripcion"), request.form.get("monto_multa"),
+                                parcial=True)
+        if error:
+            flash(error, "error")
+            return reunion_view.update_reunion(reunion)
+        reunion.update(**datos)
+        flash("Cambios guardados. Las multas ya emitidas conservan su monto original.", "success")
         return redirect(url_for("reunion.list_reuniones"))
 
     return reunion_view.update_reunion(reunion)
 
 
-# ─────────────────────────── ELIMINAR (AJAX) ─────────────────────────────────
+# ─────────────────────────── ELIMINAR ────────────────────────────────────────
 
 @reunion_bp.route("/api/reuniones/delete", methods=["POST"])
-@login_required          # Protección añadida: este endpoint no tenía @login_required
+@login_required
 @role_required("admin")
 def delete_reunion_ajax():
-    """
-    Elimina una reunión y todos sus datos asociados usando SQL masivo
-    (más eficiente que eliminar fila por fila con el ORM para grandes datasets).
-    """
+    data = request.get_json(silent=True) or {}
+    reunion_id = data.get("reunion_id")
+    if not isinstance(reunion_id, int):
+        return jsonify({"success": False, "error": "ID de reunión es requerido."}), 400
+
+    reunion = Reunion.get_by_id(reunion_id)
+    if not reunion:
+        return jsonify({"success": False, "error": f"Reunión {reunion_id} no encontrada."}), 404
+
+    descripcion = reunion.descripcion or f"Reunión {reunion_id}"
     try:
-        data       = request.get_json()
-        reunion_id = data.get("reunion_id")
-
-        if not reunion_id:
-            return jsonify({"success": False, "error": "ID de reunión es requerido."}), 400
-
-        reunion = Reunion.get_by_id(reunion_id)
-        if not reunion:
-            return jsonify({"success": False, "error": f"Reunión {reunion_id} no encontrada."}), 404
-
-        reunion_descripcion = reunion.descripcion or f"Reunión {reunion_id}"
-
-        # Obtener conteos antes de eliminar para informar al cliente
-        multas_count      = Multa.query.filter_by(reunion_id=reunion_id).count()
-        asistencias_count = Asistencia.query.filter_by(id_reunion=reunion_id).count()
-
-        # Eliminación masiva con SQL directo (respeta los nombres exactos de tablas y columnas)
-        db.session.execute(text("DELETE FROM Multa     WHERE reunion_id  = :rid"), {"rid": reunion_id})
-        db.session.execute(text("DELETE FROM Asistencia WHERE id_reunion = :rid"), {"rid": reunion_id})
-        db.session.execute(text("DELETE FROM Reunion   WHERE id          = :rid"), {"rid": reunion_id})
+        multas, asistencias = reunion.eliminar()
         db.session.commit()
-
-        return jsonify({
-            "success": True,
-            "message": f"Reunión '{reunion_descripcion}' eliminada exitosamente.",
-            "multas_eliminadas":      multas_count,
-            "asistencias_eliminadas": asistencias_count,
-            "reunion_descripcion":    reunion_descripcion,
-        })
-
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "No se pudo eliminar la reunión. No se borró nada."}), 500
 
+    return jsonify({
+        "success": True,
+        "message": f"Reunión '{descripcion}' eliminada.",
+        "multas_eliminadas": multas,
+        "asistencias_eliminadas": asistencias,
+        "reunion_descripcion": descripcion,
+    })
 
-# ─────────────────────────── ELIMINAR (FORMULARIO) ───────────────────────────
 
 @reunion_bp.route("/reuniones/<int:id>/delete", methods=["POST"])
 @login_required
 @role_required("admin")
 def delete_reunion(id):
-    """Elimina una reunión vía formulario HTML estándar."""
     reunion = Reunion.get_by_id(id)
     if not reunion:
-        flash("Reunión no encontrada.", "error")
+        flash("Esa reunión ya no existe.", "error")
         return redirect(url_for("reunion.list_reuniones"))
-
     try:
-        # Eliminar dependientes antes de la reunión (cascade manual)
-        Multa.query.filter_by(reunion_id=id).delete()
-        Asistencia.query.filter_by(id_reunion=id).delete()
-        db.session.delete(reunion)
+        multas, asistencias = reunion.eliminar()
         db.session.commit()
-        flash("Reunión eliminada exitosamente.", "success")
-    except Exception as e:
+        flash(f"Reunión eliminada con {asistencias} asistencias y {multas} multas.", "success")
+    except Exception:
         db.session.rollback()
-        flash(f"Error al eliminar la reunión: {e}", "error")
-
+        flash("No se pudo eliminar la reunión. No se borró nada.", "error")
     return redirect(url_for("reunion.list_reuniones"))

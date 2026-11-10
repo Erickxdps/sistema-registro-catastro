@@ -1,9 +1,19 @@
 <!DOCTYPE html>
-<html lang="es" data-bs-theme="light">
+<html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}{{ title or 'Inicio' }}{% endblock %} | Junta de Vecinos Circuata</title>
+    <script>
+        // Tema antes de pintar (evita el destello): preferencia guardada o la del sistema.
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('circuata-tema'); } catch (e) {}
+            if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
     <script>
         // Protección CSRF para todo POST/PUT/DELETE emitido desde JavaScript:
         // fetch() a este mismo origen lleva la cabecera X-CSRFToken, y cualquier
@@ -44,506 +54,137 @@
             }, true);
         })();
     </script>
-    <title>{% block title %}Junta de Vecinos Circuata{% endblock %}</title>
-    <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('theme') || 'light';
-                document.documentElement.setAttribute('data-bs-theme', t);
-            } catch (e) {}
-        })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    
-    <!-- Material Design 3 Web Components via CDN -->
-    <script type="importmap">
-    {
-        "imports": {
-            "@material/web/": "https://esm.run/@material/web/"
-        }
-    }
-    </script>
-    <script type="module">
-        import '@material/web/all.js';
-        import {styles as typescaleStyles} from '@material/web/typography/md-typescale-styles.js';
-        if (document.adoptedStyleSheets) {
-            document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
-        }
-    </script>
-    <style>
-        :root {
-            --font: 'Roboto', 'Inter', system-ui, -apple-system, sans-serif;
-            --brand: #2457c5;
-            --brand-hover: #1c459d;
-            --brand-ink: #2457c5;
-            --bg: #f8f9fa;
-            --surface: #ffffff;
-            --surface-2: #f1f3f8;
-            --border: #e0e3eb;
-            --text: #1b1c1e;
-            --text-2: #44474f;
-            --muted: #74777f;
-            --radius: 16px;
-            --shadow: 0 1px 3px rgba(0,0,0,0.1);
-
-            /* Material Design 3 Tokens - Light Theme */
-            --md-sys-color-primary: #2457c5;
-            --md-sys-color-on-primary: #ffffff;
-            --md-sys-color-primary-container: #dbe1ff;
-            --md-sys-color-on-primary-container: #00174c;
-            --md-sys-color-surface: #ffffff;
-            --md-sys-color-on-surface: #1b1c1e;
-            --md-sys-color-surface-container: #f1f3f8;
-            --md-sys-color-surface-container-high: #eaeef6;
-            --md-sys-color-outline: #74777f;
-            --md-sys-color-outline-variant: #c4c6d0;
-            --md-sys-shape-corner-medium: 12px;
-            --md-sys-shape-corner-large: 16px;
-
-            --t-brand: 36, 87, 197;
-            --t-success: 18, 140, 76;
-            --t-warning: 196, 112, 8;
-            --t-danger: 208, 48, 48;
-            --t-info: 2, 125, 185;
-            --t-neutral: 90, 104, 125;
-
-            --bs-primary: #2457c5;
-            --bs-primary-rgb: 36, 87, 197;
-            --bs-body-font-family: var(--font);
-            --bs-body-bg: var(--bg);
-            --bs-body-color: var(--text);
-            --bs-border-color: var(--border);
-            --bs-secondary-color: var(--muted);
-            --bs-link-color: var(--brand);
-            --bs-link-color-rgb: 36, 87, 197;
-            --bs-link-hover-color: var(--brand-hover);
-            --bs-link-hover-color-rgb: 28, 69, 157;
-        }
-
-        [data-bs-theme="dark"] {
-            --brand: #a8c8ff;
-            --brand-hover: #c4d8ff;
-            --brand-ink: #a8c8ff;
-            --bg: #111318;
-            --surface: #1a1c22;
-            --surface-2: #21242b;
-            --border: #33363e;
-            --text: #e2e2e9;
-            --text-2: #c4c6cf;
-            --muted: #8e9099;
-            --shadow: none;
-
-            /* Material Design 3 Tokens - Dark Theme */
-            --md-sys-color-primary: #a8c8ff;
-            --md-sys-color-on-primary: #002e70;
-            --md-sys-color-primary-container: #00429a;
-            --md-sys-color-on-primary-container: #dbe1ff;
-            --md-sys-color-surface: #1a1c22;
-            --md-sys-color-on-surface: #e2e2e9;
-            --md-sys-color-surface-container: #21242b;
-            --md-sys-color-surface-container-high: #2a2e37;
-            --md-sys-color-outline: #8e9099;
-            --md-sys-color-outline-variant: #44474f;
-
-            --t-brand: 168, 200, 255;
-            --t-success: 74, 200, 130;
-            --t-warning: 245, 170, 60;
-            --t-danger: 255, 120, 120;
-            --t-info: 90, 185, 240;
-            --t-neutral: 160, 172, 190;
-
-            --bs-body-bg: var(--bg);
-            --bs-body-color: var(--text);
-            --bs-border-color: var(--border);
-            --bs-secondary-color: var(--muted);
-            --bs-link-color: var(--brand-ink);
-            --bs-link-hover-color: #c4d8ff;
-            --bs-link-color-rgb: 168, 200, 255;
-            --bs-link-hover-color-rgb: 196, 216, 255;
-        }
-
-        /* ---------- Material Design 3 Utilities ---------- */
-        .md3-card {
-            position: relative;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 1.5rem;
-            transition: box-shadow 0.2s ease, border-color 0.2s ease;
-        }
-        .md3-card md-elevation {
-            --md-elevation-level: 1;
-        }
-        .md3-card:hover md-elevation {
-            --md-elevation-level: 2;
-        }
-        md-outlined-text-field {
-            width: 100%;
-            --md-outlined-text-field-container-shape: 10px;
-            margin-bottom: 0.25rem;
-        }
-        md-filled-button, md-outlined-button, md-text-button {
-            --md-filled-button-container-shape: 10px;
-            --md-outlined-button-container-shape: 10px;
-            --md-text-button-container-shape: 10px;
-            font-weight: 500;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-            font-size: 20px;
-        }
-
-        body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: .925rem; -webkit-font-smoothing: antialiased; }
-        a { text-decoration: none; }
-
-        /* ---------- Navegación ---------- */
-        .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1030; padding: .55rem 0; }
-        .app-nav .navbar-brand { display: flex; align-items: center; gap: .6rem; font-weight: 600; font-size: 1rem; color: var(--text); margin-right: 1.5rem; }
-        .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: .85rem; flex: none; }
-        .app-nav .nav-link { color: var(--text-2); font-weight: 500; font-size: .9rem; padding: .45rem .75rem; border-radius: 8px; }
-        .app-nav .nav-link:hover { background: var(--surface-2); color: var(--text); }
-        .app-nav .nav-link.active { background: rgba(var(--t-brand), .1); color: var(--brand-ink); }
-        .navbar-toggler { border-color: var(--border); }
-        [data-bs-theme="dark"] .navbar-toggler-icon { filter: invert(1); }
-        .dropdown-menu { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(16, 24, 40, .12); padding: .35rem; font-size: .875rem; }
-        .dropdown-item { border-radius: 6px; padding: .45rem .7rem; color: var(--text); }
-        .dropdown-item:hover, .dropdown-item:focus { background: var(--surface-2); color: var(--text); }
-        .dropdown-item i { width: 1.2rem; color: var(--muted); }
-        .dropdown-divider { border-color: var(--border); }
-
-        /* ---------- Estructura ---------- */
-        .app-main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 1rem 3rem; }
-        .app-footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 1rem 2rem; }
-        .page-header { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page-title { font-size: 1.4rem; font-weight: 650; letter-spacing: -.01em; margin: 0; display: flex; align-items: center; gap: .65rem; }
-        .page-title i { color: var(--brand-ink); font-size: 1.1rem; }
-        .page-sub { color: var(--muted); margin: .25rem 0 0; }
-        .page-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); --bs-card-bg: var(--surface); --bs-card-border-color: var(--border); }
-        .card-header { background: transparent; border-bottom: 1px solid var(--border); padding: .9rem 1.1rem; font-weight: 600; }
-        .card-body { padding: 1.1rem; }
-        .card-title-sm { font-size: .95rem; font-weight: 600; margin: 0; }
-        .table-card { overflow: hidden; }
-
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .9rem; margin-bottom: 1.5rem; }
-        .stat { display: flex; gap: .85rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
-        .stat-icon { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; font-size: 1rem; flex: none; background: rgba(var(--tone, var(--t-brand)), .12); color: rgb(var(--tone, var(--t-brand))); }
-        .stat-value { font-size: 1.35rem; font-weight: 650; line-height: 1.15; }
-        .stat-label { color: var(--muted); font-size: .8rem; }
-
-        .tone-brand { --tone: var(--t-brand); }
-        .tone-success { --tone: var(--t-success); }
-        .tone-warning { --tone: var(--t-warning); }
-        .tone-danger { --tone: var(--t-danger); }
-        .tone-info { --tone: var(--t-info); }
-        .tone-neutral { --tone: var(--t-neutral); }
-
-        .chip { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 550; white-space: nowrap; background: rgba(var(--tone, var(--t-neutral)), .12); color: rgb(var(--tone, var(--t-neutral))); }
-
-        .avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(var(--t-brand), .12); color: var(--brand-ink); display: grid; place-items: center; font-weight: 600; font-size: .78rem; flex: none; }
-        .person { display: flex; align-items: center; gap: .75rem; }
-        .person-name { font-weight: 550; line-height: 1.25; }
-        .person-meta { color: var(--muted); font-size: .8rem; }
-
-        .toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; padding: .9rem 1rem; border-bottom: 1px solid var(--border); }
-        .toolbar .input-group { max-width: 380px; }
-        .card-foot { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; padding: .8rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
-
-        .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
-        .empty i { font-size: 1.8rem; margin-bottom: .6rem; opacity: .55; display: block; }
-        .empty h6 { color: var(--text); font-weight: 600; margin-bottom: .25rem; }
-
-        .quick { display: flex; gap: .8rem; align-items: center; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); transition: border-color .15s, box-shadow .15s; height: 100%; }
-        .quick:hover { border-color: var(--brand); color: var(--text); box-shadow: 0 2px 8px rgba(var(--t-brand), .12); }
-        .quick strong { display: block; font-weight: 600; font-size: .9rem; }
-        .quick span { color: var(--muted); font-size: .8rem; }
-        .section-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 .75rem; }
-
-        /* ---------- Tablas ---------- */
-        .table { --bs-table-bg: transparent; --bs-table-hover-bg: var(--surface-2); --bs-table-striped-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--border); margin: 0; vertical-align: middle; }
-        .table > thead th { background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); padding: .7rem 1rem; white-space: nowrap; }
-        .table > tbody td { padding: .8rem 1rem; border-color: var(--border); }
-        .table-sm > tbody td { padding: .55rem .75rem; }
-        .table-sm > thead th { padding: .55rem .75rem; }
-        .table > tbody tr:last-child td { border-bottom: 0; }
-        .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .row-actions { display: flex; gap: .35rem; justify-content: flex-end; }
-
-        /* ---------- Botones ---------- */
-        .btn { font-weight: 500; font-size: .875rem; border-radius: 8px; }
-        .btn-sm { font-size: .8rem; }
-        .btn-primary { --bs-btn-bg: var(--brand); --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand-hover); --bs-btn-hover-border-color: var(--brand-hover); --bs-btn-active-bg: var(--brand-hover); --bs-btn-active-border-color: var(--brand-hover); --bs-btn-disabled-bg: var(--brand); --bs-btn-disabled-border-color: var(--brand); --bs-btn-color: #fff; --bs-btn-hover-color: #fff; --bs-btn-active-color: #fff; }
-        .btn-outline-primary { --bs-btn-color: var(--brand-ink); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: rgba(var(--t-brand), .1); --bs-btn-hover-color: var(--brand-ink); --bs-btn-hover-border-color: var(--brand); --bs-btn-active-bg: rgba(var(--t-brand), .16); --bs-btn-active-color: var(--brand-ink); --bs-btn-active-border-color: var(--brand); }
-        .btn-light, .btn-outline-secondary { --bs-btn-bg: var(--surface); --bs-btn-color: var(--text-2); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: var(--surface-2); --bs-btn-hover-color: var(--text); --bs-btn-hover-border-color: var(--border); --bs-btn-active-bg: var(--surface-2); --bs-btn-active-color: var(--text); --bs-btn-active-border-color: var(--border); }
-        .btn-outline-danger { --bs-btn-color: rgb(var(--t-danger)); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: rgba(var(--t-danger), .1); --bs-btn-hover-color: rgb(var(--t-danger)); --bs-btn-hover-border-color: rgb(var(--t-danger)); --bs-btn-active-bg: rgba(var(--t-danger), .16); --bs-btn-active-color: rgb(var(--t-danger)); }
-        .btn-icon { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; }
-        .theme-btn { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; }
-
-        /* ---------- Formularios ---------- */
-        .form-label { font-weight: 550; font-size: .85rem; margin-bottom: .35rem; color: var(--text); }
-        .form-control, .form-select, .input-group-text { border-color: var(--border); background-color: var(--surface); color: var(--text); border-radius: 8px; font-size: .9rem; padding: .55rem .75rem; }
-        .form-control::placeholder { color: var(--muted); opacity: .7; }
-        .form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--t-brand), .18); background-color: var(--surface); color: var(--text); }
-        .input-group-text { background: var(--surface-2); color: var(--muted); }
-        .form-text { color: var(--muted); font-size: .78rem; margin-top: .3rem; }
-        .form-check-input:checked { background-color: var(--brand); border-color: var(--brand); }
-        .form-shell { max-width: 720px; margin: 0 auto; }
-        .form-shell.wide { max-width: 860px; }
-        .form-actions { display: flex; justify-content: flex-end; gap: .6rem; padding-top: 1.25rem; margin-top: 1.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; }
-        .switch-card { display: flex; align-items: center; gap: .9rem; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
-        .switch-card .form-check-input { width: 2.6em; height: 1.4em; margin: 0; flex: none; }
-        .notice { display: flex; gap: .7rem; padding: .85rem 1rem; border-radius: var(--radius); background: rgba(var(--t-info), .08); border: 1px solid rgba(var(--t-info), .22); color: var(--text-2); font-size: .85rem; }
-        .notice i { color: rgb(var(--t-info)); margin-top: .15rem; }
-        .notice.warn { background: rgba(var(--t-warning), .08); border-color: rgba(var(--t-warning), .25); }
-        .notice.warn i { color: rgb(var(--t-warning)); }
-
-        /* ---------- Alertas, modales, paginación ---------- */
-        .alert { --tone: var(--t-neutral); border-radius: var(--radius); border: 1px solid rgba(var(--tone), .28); background: rgba(var(--tone), .09); color: var(--text); padding: .8rem 1rem; display: flex; gap: .7rem; align-items: flex-start; }
-        .alert-success { --tone: var(--t-success); }
-        .alert-danger { --tone: var(--t-danger); }
-        .alert-warning { --tone: var(--t-warning); }
-        .alert-info { --tone: var(--t-info); }
-        .alert > i:first-child { color: rgb(var(--tone)); margin-top: .2rem; }
-        .alert .btn-close { margin-left: auto; padding: .9rem 1rem; }
-        .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); }
-        .modal-header { border-bottom: 1px solid var(--border); padding: 1rem 1.25rem; }
-        .modal-footer { border-top: 1px solid var(--border); }
-        .modal-title { font-size: 1.05rem; font-weight: 600; }
-        .pagination { --bs-pagination-bg: var(--surface); --bs-pagination-border-color: var(--border); --bs-pagination-color: var(--text-2); --bs-pagination-hover-bg: var(--surface-2); --bs-pagination-hover-color: var(--text); --bs-pagination-hover-border-color: var(--border); --bs-pagination-active-bg: var(--brand); --bs-pagination-active-border-color: var(--brand); --bs-pagination-disabled-bg: var(--surface); --bs-pagination-disabled-border-color: var(--border); --bs-pagination-focus-box-shadow: none; }
-        .progress { height: 8px; background: var(--surface-2); border-radius: 999px; }
-        .progress-bar { background: var(--brand); }
-
-        .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; }
-        .auth-card { width: 100%; max-width: 400px; }
-        .hero { padding: 1.75rem; display: flex; flex-wrap: wrap; gap: 1.25rem; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-        .hero h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -.02em; margin: 0 0 .35rem; }
-        .hero p { color: var(--text-2); margin: 0; max-width: 52ch; }
-
-        /* ---------- Compatibilidad con plantillas aún no migradas ---------- */
-        .card.shadow { box-shadow: var(--shadow) !important; }
-        .card-header[class*="bg-"] { background: transparent !important; color: var(--text) !important; border-bottom: 1px solid var(--border); }
-        .card-header[class*="bg-"] .btn-light { --bs-btn-bg: var(--brand); --bs-btn-color: #fff; --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand-hover); --bs-btn-hover-color: #fff; }
-        .table-dark { --bs-table-bg: var(--surface-2); --bs-table-color: var(--muted); }
-        .table-striped > tbody > tr:nth-of-type(odd) > * { --bs-table-bg-type: transparent; }
-        .alert-light { --tone: var(--t-neutral); }
-        .badge { font-weight: 550; }
-
-        @media (max-width: 575.98px) {
-            .page-actions { width: 100%; }
-            .page-actions .btn { flex: 1; }
-            .hero { padding: 1.25rem; }
-            .app-main { padding-top: 1.25rem; }
-        }
-    </style>
-    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Zilla+Slab:wght@500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0..1,0&display=block">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect width='30' height='30' rx='5' fill='%231F4D3F'/%3E%3Crect x='6' y='6' width='8' height='8' rx='1.5' fill='%23C9951F'/%3E%3Crect x='16' y='6' width='8' height='8' rx='1.5' fill='%23ffffff' fill-opacity='.55'/%3E%3Crect x='6' y='16' width='8' height='8' rx='1.5' fill='%23ffffff' fill-opacity='.55'/%3E%3Crect x='16' y='16' width='8' height='8' rx='1.5' fill='%23ffffff' fill-opacity='.3'/%3E%3C/svg%3E">
 </head>
-
-{% macro navlink(ep, prefix, url, icon, label) %}
-<li class="nav-item">
-    <a class="nav-link {{ 'active' if ep.startswith(prefix) else '' }}" href="{{ url }}">
-        <i class="fas {{ icon }} me-1"></i>{{ label }}
-    </a>
-</li>
-{% endmacro %}
-
-<body class="{% block body_class %}{% endblock %}">
-{% block nav %}
+<body>
+{% from '_macros.html' import icono %}
 {% set ep = request.endpoint or '' %}
-<nav class="navbar navbar-expand-lg app-nav">
-    <div class="container-xl">
-        <a class="navbar-brand" href="{{ url_for('user.index') }}">
-            <span class="brand-mark"><i class="fas fa-home"></i></span>
-            <span>Junta de Vecinos Circuata</span>
+{% set bp = request.blueprint or '' %}
+
+{% block cuerpo %}
+<a class="sr-only" href="#contenido">Saltar al contenido</a>
+<div class="app">
+    <aside class="lateral" aria-label="Navegación principal">
+        <a class="marca" href="{{ url_for('user.index') }}">
+            <svg class="marca-logo" viewBox="0 0 30 30" aria-hidden="true">
+                <rect x="1" y="1" width="8" height="8" rx="1.5" fill="#C9951F"/>
+                <rect x="11" y="1" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+                <rect x="21" y="1" width="8" height="8" rx="1.5" fill="currentColor" opacity=".35"/>
+                <rect x="1" y="11" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+                <rect x="11" y="11" width="8" height="8" rx="1.5" fill="currentColor" opacity=".35"/>
+                <rect x="21" y="11" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+                <rect x="1" y="21" width="8" height="8" rx="1.5" fill="currentColor" opacity=".35"/>
+                <rect x="11" y="21" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+                <rect x="21" y="21" width="8" height="8" rx="1.5" fill="currentColor" opacity=".2"/>
+            </svg>
+            <span class="marca-texto"><strong>Circuata</strong><span>Junta de Vecinos</span></span>
         </a>
 
-        {% if current_user.is_authenticated %}
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
-                aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        {% macro enlace(endpoint, activo, icono_nombre, texto) -%}
+        <a class="nav-enlace" href="{{ url_for(endpoint) }}"{% if activo %} aria-current="page"{% endif %}>
+            <span class="ico" aria-hidden="true">{{ icono_nombre }}</span>{{ texto }}
+        </a>
+        {%- endmacro %}
 
-        <div class="collapse navbar-collapse" id="mainNav">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                {{ navlink(ep, 'user.index', url_for('user.index'), 'fa-home', 'Inicio') }}
-                {{ navlink(ep, 'duenio.', url_for('duenio.list_duenios'), 'fa-users', 'Propietarios') }}
-                {{ navlink(ep, 'terreno.', url_for('terreno.list_terrenos'), 'fa-map-marked-alt', 'Terrenos') }}
-                {{ navlink(ep, 'reunion.', url_for('reunion.list_reuniones'), 'fa-calendar-alt', 'Reuniones') }}
-                {{ navlink(ep, 'asistencia.', url_for('asistencia.list_asistencias'), 'fa-clipboard-check', 'Asistencias') }}
-                {{ navlink(ep, 'cuota.', url_for('cuota.list_cuotas'), 'fa-receipt', 'Cuotas') }}
-                {{ navlink(ep, 'multa.', url_for('multa.list_multas'), 'fa-gavel', 'Multas') }}
-                {{ navlink(ep, 'reporte.', url_for('reporte.index'), 'fa-chart-pie', 'Reportes') }}
-            </ul>
+        <nav class="nav">
+            {{ enlace('user.index', ep == 'user.index', 'grid_view', 'Inicio') }}
+            {% if current_user.is_authenticated %}
+            {{ enlace('duenio.list_duenios', bp == 'duenio', 'group', 'Propietarios') }}
+            {{ enlace('terreno.list_terrenos', bp == 'terreno', 'fence', 'Terrenos') }}
+            {% endif %}
+            {{ enlace('reunion.list_reuniones', bp == 'reunion', 'event', 'Reuniones') }}
+            {% if current_user.is_authenticated %}
+            {{ enlace('asistencia.list_asistencias', bp == 'asistencia', 'how_to_reg', 'Asistencias') }}
+            <div class="nav-grupo">Cuentas de la junta</div>
+            {{ enlace('cuota.list_cuotas', bp == 'cuota', 'receipt_long', 'Cuotas') }}
+            {{ enlace('multa.list_multas', bp == 'multa', 'gavel', 'Multas') }}
+            {{ enlace('reporte.index', bp == 'reporte', 'summarize', 'Reportes') }}
+            {% if current_user.has_role('admin') %}
+            <div class="nav-grupo">Administración</div>
+            {{ enlace('user.list_users', ep in ('user.list_users', 'user.create_user', 'user.update_user'), 'manage_accounts', 'Usuarios') }}
+            {% endif %}
+            {% endif %}
+        </nav>
 
-            <div class="d-flex align-items-center gap-2">
-                {% if current_user.has_role("admin") %}
-                <div class="dropdown">
-                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-plus me-1"></i>Nuevo
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{{ url_for('duenio.create_duenio') }}"><i class="fas fa-user-plus"></i>Propietario</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('terreno.create_terreno') }}"><i class="fas fa-map"></i>Terreno</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('reunion.create_reunion') }}"><i class="fas fa-calendar-plus"></i>Reunión</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('asistencia.create_asistencia') }}"><i class="fas fa-check-circle"></i>Asistencia</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('cuota.create_cuota') }}"><i class="fas fa-money-bill"></i>Cuota</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('multa.create_multa') }}"><i class="fas fa-exclamation-triangle"></i>Multa</a></li>
-                    </ul>
-                </div>
-                {% endif %}
-
-                <button class="btn btn-light theme-btn" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
-                    <i class="fas fa-moon" id="themeIcon"></i>
-                </button>
-
-                <div class="dropdown">
-                    <a class="btn btn-light btn-sm dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-user-circle me-1"></i>{{ current_user.username }}
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{{ url_for('user.profile', id=current_user.id) }}"><i class="fas fa-user-edit"></i>Perfil</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{{ url_for('user.logout') }}"><i class="fas fa-sign-out-alt"></i>Cerrar sesión</a></li>
-                    </ul>
-                </div>
-            </div>
+        <div class="lateral-pie">
+            {% if current_user.is_authenticated %}
+            Sesión de {{ current_user.username }}{% if current_user.has_role('admin') %}, administrador{% else %}, consulta{% endif %}
+            {% else %}
+            Vista pública. Inicia sesión para registrar y editar.
+            {% endif %}
         </div>
-        {% else %}
-        <div class="ms-auto d-flex align-items-center gap-2">
-            <button class="btn btn-light theme-btn" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
-                <i class="fas fa-moon" id="themeIcon"></i>
+    </aside>
+    <div class="velo" hidden></div>
+
+    <div class="principal">
+        <header class="barra">
+            <button type="button" class="boton boton-sutil boton-icono boton-menu" data-menu aria-expanded="false" aria-label="Abrir menú">
+                {{ icono('menu') }}
             </button>
-            <a href="{{ url_for('user.login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt me-1"></i>Iniciar sesión</a>
-        </div>
-        {% endif %}
+
+            <form class="barra-busqueda" method="get" role="search"
+                  action="{{ url_for('duenio.list_duenios') if current_user.is_authenticated else url_for('user.index') }}">
+                <div class="buscador" data-buscador data-modo="navegar" data-url="{{ url_for('busqueda.buscar_propietarios') }}">
+                    <label class="sr-only" for="busqueda-global">Buscar propietario</label>
+                    <div class="buscador-campo">
+                        {{ icono('search') }}
+                        <input id="busqueda-global" type="search" name="search" placeholder="Buscar propietario por nombre o apellido"
+                                value="{{ request.args.get('search', '') if ep in ('duenio.list_duenios', 'user.index') else '' }}">
+                        <span class="buscador-carga" hidden></span>
+                        <ul class="buscador-lista" hidden></ul>
+                    </div>
+                </div>
+            </form>
+
+            <div class="barra-acciones">
+                <button type="button" class="boton boton-sutil boton-icono" data-tema aria-pressed="false" aria-label="Usar modo oscuro">
+                    {{ icono('dark_mode') }}
+                </button>
+                {% if current_user.is_authenticated %}
+                <details class="menu">
+                    <summary class="boton boton-sutil" aria-label="Menú de la cuenta">
+                        {{ icono('account_circle') }}<span class="cuenta-nombre">{{ current_user.username }}</span>
+                    </summary>
+                    <div class="menu-lista" role="menu">
+                        <a class="menu-item" role="menuitem" href="{{ url_for('user.profile', id=current_user.id) }}">{{ icono('badge') }}Mi perfil</a>
+                        <div class="menu-separador"></div>
+                        <a class="menu-item" role="menuitem" href="{{ url_for('user.logout') }}">{{ icono('logout') }}Cerrar sesión</a>
+                    </div>
+                </details>
+                {% else %}
+                <a class="boton boton-principal" href="{{ url_for('user.login', next=request.full_path if ep != 'user.index' else None) }}">
+                    {{ icono('login') }}Iniciar sesión
+                </a>
+                {% endif %}
+            </div>
+        </header>
+
+        <main class="contenido" id="contenido">
+            {% block content %}{% endblock %}
+        </main>
     </div>
-</nav>
+</div>
 {% endblock %}
 
-{% block container %}
-<main class="app-main">
-    {% include '_flash.html' %}
-    {% block content %}{% endblock %}
-</main>
-<footer class="app-footer">Sistema de Gestión Comunitaria · Junta de Vecinos Circuata</footer>
-{% endblock %}
+{% include '_flash.html' %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://kit.fontawesome.com/5ab8239d15.js" crossorigin="anonymous"></script>
-<script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
-<script>
-    (function () {
-        var root = document.documentElement;
-        var icon = document.getElementById('themeIcon');
-        var btn = document.getElementById('themeToggle');
+<dialog class="dialogo" id="dialogo-confirmar" aria-labelledby="dialogo-titulo">
+    <div class="dialogo-cuerpo">
+        <h2 id="dialogo-titulo" data-dialogo-titulo>¿Confirmas esta acción?</h2>
+        <p data-dialogo-mensaje></p>
+    </div>
+    <div class="dialogo-pie">
+        <button type="button" class="boton" data-dialogo-cancelar>Cancelar</button>
+        <button type="button" class="boton boton-peligro" data-dialogo-aceptar>Eliminar</button>
+    </div>
+</dialog>
 
-        function paint(theme) {
-            if (icon) icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        }
-        paint(root.getAttribute('data-bs-theme'));
-
-        if (btn) {
-            btn.addEventListener('click', function () {
-                var next = root.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
-                root.setAttribute('data-bs-theme', next);
-                try { localStorage.setItem('theme', next); } catch (e) {}
-                paint(next);
-            });
-        }
-
-        // Alertas de éxito/info se cierran solas
-        setTimeout(function () {
-            document.querySelectorAll('.alert-success, .alert-info').forEach(function (el) {
-                bootstrap.Alert.getOrCreateInstance(el).close();
-            });
-        }, 6000);
-
-        // Confirmación genérica: <form data-confirm="mensaje">
-        document.addEventListener('submit', function (e) {
-            var msg = e.target.getAttribute && e.target.getAttribute('data-confirm');
-            if (msg && !window.confirm(msg)) e.preventDefault();
-        });
-
-        // Filtro para <select>: <input data-filter-for="id_del_select">
-        document.querySelectorAll('[data-filter-for]').forEach(function (input) {
-            var select = document.getElementById(input.dataset.filterFor);
-            if (!select) return;
-            input.addEventListener('input', function () {
-                var q = input.value.trim().toLowerCase();
-                Array.prototype.forEach.call(select.options, function (opt) {
-                    if (!opt.value) return;
-                    var match = opt.text.toLowerCase().indexOf(q) > -1;
-                    opt.hidden = !match;
-                    opt.disabled = !match;
-                });
-            });
-        });
-
-        // Soporte de compatibilidad para Web Components de Material Design 3 en formularios Flask
-        document.addEventListener('submit', function (e) {
-            var form = e.target;
-            if (form && form.tagName === 'FORM') {
-                var mdFields = form.querySelectorAll('md-outlined-text-field');
-                mdFields.forEach(function (field) {
-                    var name = field.getAttribute('name');
-                    if (name) {
-                        var hidden = form.querySelector('input[type="hidden"][name="' + name + '"]');
-                        if (!hidden) {
-                            hidden = document.createElement('input');
-                            hidden.type = 'hidden';
-                            hidden.name = name;
-                            form.appendChild(hidden);
-                        }
-                        hidden.value = field.value || '';
-                    }
-                });
-                var mdChecks = form.querySelectorAll('md-checkbox');
-                mdChecks.forEach(function (cb) {
-                    var name = cb.getAttribute('name');
-                    if (name) {
-                        var hidden = form.querySelector('input[type="hidden"][name="' + name + '"]');
-                        if (cb.checked) {
-                            if (!hidden) {
-                                hidden = document.createElement('input');
-                                hidden.type = 'hidden';
-                                hidden.name = name;
-                                form.appendChild(hidden);
-                            }
-                            hidden.value = cb.value || 'on';
-                        } else if (hidden) {
-                            hidden.remove();
-                        }
-                    }
-                });
-            }
-        });
-
-        // Soporte de click para botones submit MD3
-        document.addEventListener('click', function (e) {
-            var btn = e.target.closest('md-filled-button[type="submit"], md-outlined-button[type="submit"]');
-            if (btn) {
-                var form = btn.closest('form');
-                if (form) {
-                    if (form.requestSubmit) {
-                        form.requestSubmit(btn);
-                    } else {
-                        form.submit();
-                    }
-                }
-            }
-        });
-
-        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-            new bootstrap.Tooltip(el);
-        });
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

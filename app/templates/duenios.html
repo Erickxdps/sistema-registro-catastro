@@ -1,150 +1,74 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, initials, empty_state, pagination %}
-
-{% block title %}Propietarios · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar, persona %}
 
 {% block content %}
-{% call page_header('Propietarios', 'Personas registradas y su situación de multas', 'fa-users') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('duenio.create_duenio') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">person_add</md-icon>
-            Nuevo propietario
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% set es_admin = current_user.has_role('admin') %}
+{% call cabecera('Propietarios', 'Personas registradas en el padrón, con sus terrenos y su situación de pagos.') %}
+    {% if es_admin %}<a class="boton boton-principal" href="{{ url_for('duenio.create_duenio') }}">{{ icono('person_add') }}Registrar propietario</a>{% endif %}
 {% endcall %}
 
-{% if duenios_paginated and duenios_paginated.total > 0 %}
-<div class="stats">
-    {{ stat('Registrados' ~ (' (búsqueda)' if search else ''), duenios_paginated.total, 'fa-users', 'brand') }}
-    {{ stat('Al día', duenios_sin_multas if duenios_sin_multas is defined else '—', 'fa-check-circle', 'success') }}
-    {{ stat('Con multas pendientes', duenios_con_multas if duenios_con_multas is defined else '—', 'fa-exclamation-triangle', 'warning') }}
-</div>
-{% endif %}
+<div class="hoja">
+    {% call filtros() %}
+        {{ buscador('buscar-duenios', url_for('busqueda.buscar_propietarios'), 'Buscar propietario', valor=search,
+                    placeholder='Nombre, apellido o CI', etiqueta_visible=False) }}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    {% endcall %}
 
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <form method="GET" action="{{ url_for('duenio.list_duenios') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" name="search" class="form-control border-start-0" placeholder="Buscar por nombre, apellido o CI..." value="{{ search or '' }}">
-            </div>
-            <md-filled-button type="submit">Buscar</md-filled-button>
-            {% if search %}
-            <a href="{{ url_for('duenio.list_duenios') }}" class="text-decoration-none">
-                <md-outlined-button type="button" title="Limpiar filtro">Limpiar</md-outlined-button>
-            </a>
-            {% endif %}
-        </form>
-        {% if duenios_paginated and duenios_paginated.total > 0 %}
-        <span class="text-muted small">
-            {{ duenios_paginated.per_page * (duenios_paginated.page - 1) + 1 }}–{{ duenios_paginated.per_page * (duenios_paginated.page - 1) + duenios|length }}
-            de {{ duenios_paginated.total }} registros
-        </span>
-        {% endif %}
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="dueniosTable">
+    {% if duenios_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">Propietario</th>
-                    <th>CI</th>
-                    <th>Estado</th>
-                    <th>Multas</th>
-                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                    {{ th_orden('Propietario', 'nombre', orden) }}
+                    {{ th_orden('CI', 'ci', orden) }}
+                    <th class="derecha">Terrenos</th>
+                    <th class="derecha">Cuotas pendientes</th>
+                    <th class="derecha">Multas</th>
+                    <th>Situación</th>
+                    <th class="acciones"><span class="sr-only">Acciones</span></th>
                 </tr>
             </thead>
             <tbody>
-                {% for duenio in duenios %}
+            {% for d in duenios_paginated.items %}
+                {% set deuda = deudas.get(d.id, {'cuotas': 0, 'multas': 0, 'total': 0}) %}
                 <tr>
-                    <td class="ps-3">
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(duenio.nombre, duenio.paterno) }}
-                            </div>
-                            <div>
-                                <div class="person-name fw-medium">{{ duenio.nombre }} {{ duenio.paterno }}</div>
-                                <div class="person-meta small text-muted">{{ duenio.materno or '' }}</div>
-                            </div>
-                        </div>
+                    <td class="celda-titulo">{{ persona(d, url_for('reporte.estado_cuenta_imprimible', duenio_id=d.id)) }}</td>
+                    <td data-label="CI" class="num">{{ d.ci }}</td>
+                    <td data-label="Terrenos" class="derecha num">
+                        <a href="{{ url_for('terreno.list_terrenos', search=d.nombre_completo) }}">{{ lotes.get(d.id, 0) }}</a>
                     </td>
-                    <td class="num">{{ duenio.ci }}</td>
-                    <td>
-                        {% if duenio.multas %}
-                        <span class="chip tone-warning"><i class="fas fa-exclamation-triangle me-1"></i>Con multas</span>
-                        {% else %}
-                        <span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Al día</span>
-                        {% endif %}
+                    <td data-label="Cuotas pendientes" class="derecha num">{{ 'Bs ' ~ deuda.cuotas|bs if deuda.cuotas else '—' }}</td>
+                    <td data-label="Multas" class="derecha num">{{ 'Bs ' ~ deuda.multas|bs if deuda.multas else '—' }}</td>
+                    <td data-label="Situación">
+                        {% if d.es_immune %}<span class="estado estado-info">Entidad de la junta</span>
+                        {% elif deuda.total > 0 %}<span class="estado estado-deuda">Debe Bs {{ deuda.total|bs }}</span>
+                        {% else %}<span class="estado estado-ok">Al día</span>{% endif %}
                     </td>
-                    <td class="num">
-                        {% if duenio.multas %}
-                        <span class="fw-semibold text-danger">
-                            Bs. {{ '%.2f'|format(duenio.multas|sum(attribute='monto')) }}
-                        </span>
-                        <span class="text-muted small">({{ duenio.multas|length }})</span>
-                        {% else %}
-                        <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-                    {% if current_user.has_role('admin') %}
-                    <td class="pe-3">
-                        <div class="row-actions justify-content-end gap-1">
-                            <a href="{{ url_for('reporte.estado_cuenta_imprimible', duenio_id=duenio.id) }}" class="btn btn-light btn-icon btn-sm text-primary" title="Imprimir / Exportar Estado de Cuenta" target="_blank">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">print</span>
-                            </a>
-                            <a href="{{ url_for('duenio.update_duenio', id=duenio.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-                            </a>
-                            <form method="post" action="{{ url_for('duenio.delete_duenio', id=duenio.id) }}"
-                                  data-confirm="¿Eliminar a {{ duenio.nombre }} {{ duenio.paterno }} y sus terrenos asociados?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                    {% endif %}
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5">
-                        {% if search %}
-                            {% call empty_state('fa-search', 'Sin resultados', 'No hay propietarios que coincidan con "' ~ search ~ '"') %}
-                                <a href="{{ url_for('duenio.list_duenios') }}" class="btn btn-light btn-sm">Ver todos</a>
-                            {% endcall %}
-                        {% else %}
-                            {% call empty_state('fa-inbox', 'Aún no hay propietarios', 'Registra el primero para empezar.') %}
-                                {% if current_user.has_role('admin') %}
-                                <a href="{{ url_for('duenio.create_duenio') }}" class="btn btn-primary btn-sm">Registrar propietario</a>
-                                {% endif %}
-                            {% endcall %}
-                        {% endif %}
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones para ' ~ d.nombre_completo) %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('reporte.estado_cuenta_imprimible', duenio_id=d.id) }}">{{ icono('request_quote') }}Estado de cuenta</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('multa.multas_por_duenio', duenio_id=d.id) }}">{{ icono('gavel') }}Ver multas</a>
+                            {% if es_admin %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('terreno.create_terreno', duenio_id=d.id) }}">{{ icono('add_location_alt') }}Asignar terreno</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('duenio.update_duenio', id=d.id) }}">{{ icono('edit') }}Editar datos</a>
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('duenio.delete_duenio', id=d.id),
+                                           'Se eliminarán ' ~ d.nombre_completo ~ ', sus ' ~ lotes.get(d.id, 0) ~ ' terrenos con sus cuotas, sus multas y sus asistencias. No se puede deshacer.',
+                                           titulo='¿Eliminar a este propietario?') }}
+                            {% endif %}
+                        {% endcall %}
                     </td>
                 </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
-
-    {% if duenios_paginated and duenios_paginated.pages > 1 %}
-    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
-        <form method="GET" action="{{ url_for('duenio.list_duenios') }}" class="d-flex align-items-center gap-2">
-            <input type="hidden" name="search" value="{{ search or '' }}">
-            <span class="small text-muted">Mostrar</span>
-            <select name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
-                {% for n in [10, 25, 50, 100] %}
-                <option value="{{ n }}" {% if request.args.get('per_page', '10') == n|string %}selected{% endif %}>{{ n }}</option>
-                {% endfor %}
-            </select>
-            <span class="small text-muted">por página</span>
-        </form>
-        {{ pagination(duenios_paginated, 'duenio.list_duenios', search=search) }}
-    </div>
+    {{ paginacion(duenios_paginated, 'propietarios') }}
+    {% elif search %}
+    {{ vacio('Nadie coincide con “' ~ search ~ '”', 'Prueba con solo el nombre, un apellido o el CI.', url_con(search=None, page=None), 'Ver todos', 'list') }}
+    {% else %}
+    {{ vacio('Todavía no hay propietarios', 'Registra al primero para empezar a asignar terrenos.',
+             url_for('duenio.create_duenio') if es_admin else None, 'Registrar propietario', 'person_add') }}
     {% endif %}
 </div>
 {% endblock %}

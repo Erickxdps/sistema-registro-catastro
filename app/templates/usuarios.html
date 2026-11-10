@@ -1,114 +1,58 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header, stat, empty_state %}
-
-{% block title %}Usuarios · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import icono, cabecera, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, item_borrar %}
 
 {% block content %}
-{% call page_header('Usuarios', 'Cuentas con acceso al sistema administrativo', 'fa-user-shield') %}
-    {% if current_user.has_role('admin') %}
-    <a href="{{ url_for('user.create_user') }}" class="text-decoration-none">
-        <md-filled-button>
-            <md-icon slot="icon" class="material-symbols-outlined">person_add</md-icon>
-            Nuevo usuario
-        </md-filled-button>
-    </a>
-    {% endif %}
+{% call cabecera('Usuarios', 'Cuentas con acceso al sistema. Administración puede editar; consulta solo puede ver.') %}
+    <a class="boton boton-principal" href="{{ url_for('user.create_user') }}">{{ icono('person_add') }}Crear usuario</a>
 {% endcall %}
 
-{% if users %}
-<div class="stats">
-    {{ stat('Administradores', users|selectattr('role', 'equalto', 'admin')|list|length, 'fa-user-shield', 'danger') }}
-    {{ stat('Usuarios regulares', users|rejectattr('role', 'equalto', 'admin')|list|length, 'fa-user', 'info') }}
-</div>
-{% endif %}
+<div class="hoja">
+    {% call filtros() %}
+        {{ buscador('buscar-usuarios', url_for('busqueda.buscar_usuarios'), 'Buscar usuario', valor=search,
+                    placeholder='Nombre de usuario o rol', etiqueta_visible=False) }}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    {% endcall %}
 
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom">
-        <div class="input-group" style="max-width: 360px;">
-            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Filtrar por usuario o rol...">
-        </div>
-        <span class="text-muted small" id="conteoFilas"></span>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="usuariosTable">
+    {% if users.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">ID</th>
-                    <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Estado</th>
-                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                    {{ th_orden('Usuario', 'usuario', orden) }}
+                    {{ th_orden('Rol', 'rol', orden) }}
+                    <th class="acciones"><span class="sr-only">Acciones</span></th>
                 </tr>
             </thead>
             <tbody>
-                {% for user in users %}
-                <tr class="fila">
-                    <td class="text-muted num ps-3">#{{ user.id }}</td>
-                    <td>
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ (user.username or '?')[:2]|upper }}
-                            </div>
-                            <div class="person-name fw-medium">{{ user.username }}</div>
-                        </div>
+            {% for u in users.items %}
+                <tr>
+                    <td class="celda-titulo">
+                        <span class="celda-principal">{{ u.username }}</span>
+                        {% if u.id == current_user.id %}<span class="celda-secundaria">Tu cuenta</span>{% endif %}
                     </td>
-                    <td>
-                        {% if user.role == 'admin' %}
-                        <span class="chip tone-danger"><i class="fas fa-shield-alt me-1"></i>Administrador</span>
-                        {% else %}
-                        <span class="chip tone-info"><i class="fas fa-user me-1"></i>{{ user.role }}</span>
-                        {% endif %}
+                    <td data-label="Rol">
+                        {% if u.role == 'admin' %}<span class="etiqueta etiqueta-ok">Administración</span>
+                        {% elif u.role == 'doctor' %}<span class="etiqueta etiqueta-info">Consulta</span>
+                        {% else %}<span class="etiqueta etiqueta-pend" title="Rol no reconocido: {{ u.role }}">Rol no válido: {{ u.role }}</span>{% endif %}
                     </td>
-                    <td><span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Activo</span></td>
-                    {% if current_user.has_role('admin') %}
-                    <td class="pe-3">
-                        <div class="row-actions justify-content-end gap-1">
-                            <a href="{{ url_for('user.update_user', id=user.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-                            </a>
-                            {% if user.id != current_user.id %}
-                            <form method="post" action="{{ url_for('user.delete_user', id=user.id) }}"
-                                  data-confirm="¿Eliminar definitivamente el usuario {{ user.username }}?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
-                                </button>
-                            </form>
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones para ' ~ u.username) %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('user.update_user', id=u.id) }}">{{ icono('edit') }}Cambiar rol o contraseña</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('user.profile', id=u.id) }}">{{ icono('badge') }}Ver perfil</a>
+                            {% if u.id != current_user.id %}
+                            <div class="menu-separador"></div>
+                            {{ item_borrar(url_for('user.delete_user', id=u.id), 'La cuenta ' ~ u.username ~ ' dejará de tener acceso. No se puede deshacer.', titulo='¿Eliminar esta cuenta?') }}
                             {% endif %}
-                        </div>
+                        {% endcall %}
                     </td>
-                    {% endif %}
                 </tr>
-                {% else %}
-                <tr><td colspan="5">{{ empty_state('fa-inbox', 'No hay usuarios registrados') }}</td></tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
+    {{ paginacion(users, 'usuarios') }}
+    {% else %}
+    {{ vacio('Ningún usuario coincide con “' ~ search ~ '”', 'Prueba con otra parte del nombre.', url_con(search=None, page=None), 'Ver todos', 'list') }}
+    {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    (function () {
-        var filtro = document.getElementById('filtroTabla');
-        var filas = document.querySelectorAll('.fila');
-        var conteo = document.getElementById('conteoFilas');
-        function actualizar() {
-            var q = (filtro.value || '').trim().toLowerCase(), n = 0;
-            filas.forEach(function (f) {
-                var ok = f.textContent.toLowerCase().indexOf(q) > -1;
-                f.style.display = ok ? '' : 'none';
-                if (ok) n++;
-            });
-            conteo.textContent = n + ' usuario' + (n !== 1 ? 's' : '');
-        }
-        filtro.addEventListener('input', actualizar);
-        actualizar();
-    })();
-</script>
 {% endblock %}

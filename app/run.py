@@ -183,6 +183,9 @@ def create_app(config_overrides=None):
     db.init_app(app)
     csrf.init_app(app)
 
+    from utils import plantillas
+    plantillas.registrar(app)
+
     login_manager = LoginManager()
     login_manager.login_view = "user.login"
     login_manager.login_message = "Inicia sesión para acceder a esta página."
@@ -198,7 +201,7 @@ def create_app(config_overrides=None):
             return None
 
     # Import diferido: los controladores importan modelos que dependen de `db`.
-    from controllers import (asistencia_controller, cuota_controller, duenio_controller,
+    from controllers import (asistencia_controller, busqueda_controller, cuota_controller, duenio_controller,
                              multa_controller, reporte_controller, reunion_controller,
                              terreno_controller, user_controller)
     app.register_blueprint(user_controller.user_bp)
@@ -209,6 +212,7 @@ def create_app(config_overrides=None):
     app.register_blueprint(cuota_controller.cuota_bp)
     app.register_blueprint(multa_controller.multa_bp)
     app.register_blueprint(reporte_controller.reporte_bp)
+    app.register_blueprint(busqueda_controller.busqueda_bp)
 
     @app.errorhandler(CSRFError)
     def manejar_csrf(_error):

@@ -1,331 +1,184 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import stat, initials, empty_state, pagination %}
+{% from '_macros.html' import icono, th_orden, paginacion, buscador, filtros, vacio, menu_acciones, persona %}
 
-{% block title %}Inicio · Junta de Vecinos Circuata{% endblock %}
+{% block title %}Inicio{% endblock %}
 
 {% block content %}
-<section class="md3-card mb-4" style="position: relative; overflow: hidden; background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);">
-    <md-elevation></md-elevation>
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="material-symbols-outlined text-primary" style="font-size: 28px;">location_city</span>
-                <span class="badge text-bg-primary">Comunidad Circuata</span>
-            </div>
-            <h1 class="h3 fw-bold mb-1">Junta de Vecinos Circuata</h1>
-            <p class="text-muted mb-0">Gestión integral de propietarios, terrenos, asambleas y aportes comunitarios.</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-            {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('user.login') }}" class="text-decoration-none">
-                <md-filled-button>
-                    <md-icon slot="icon" class="material-symbols-outlined">login</md-icon>
-                    Iniciar sesión
-                </md-filled-button>
-            </a>
-            <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#aboutSystemModal">
-                <i class="fas fa-info-circle me-1"></i>Conocer más
-            </button>
-            {% else %}
-            <a href="{{ url_for('duenio.list_duenios') }}" class="text-decoration-none">
-                <md-filled-button>
-                    <md-icon slot="icon" class="material-symbols-outlined">groups</md-icon>
-                    Ver propietarios
-                </md-filled-button>
-            </a>
-            <a href="{{ url_for('user.logout') }}" class="text-decoration-none">
-                <md-outlined-button>
-                    <md-icon slot="icon" class="material-symbols-outlined">logout</md-icon>
-                    Cerrar sesión
-                </md-outlined-button>
-            </a>
-            {% endif %}
-        </div>
-    </div>
-</section>
+{% set autenticado = current_user.is_authenticated %}
+{% set es_admin = current_user.has_role('admin') %}
 
-<div class="stats mb-4">
-    {{ stat('Propietarios', duenos_count or 0, 'fa-users', 'brand') }}
-    {{ stat('Terrenos registrados', terrenos_count or 0, 'fa-map-marked-alt', 'success') }}
-    {{ stat('Reuniones convocadas', reuniones_count or 0, 'fa-calendar-alt', 'warning') }}
-    {{ stat('Tipos de cuota', cuotas_count or 0, 'fa-money-bill-wave', 'info') }}
+<div class="portada">
+    <h1>Junta de Vecinos Circuata</h1>
+    <p class="portada-lema">
+        Padrón de <strong>{{ duenos_count|entero }}</strong> propietarios con
+        <strong>{{ terrenos_count|entero }}</strong> terrenos en <strong>{{ plano|length }}</strong> manzanos.
+        {% if reuniones_count %}Se registraron <strong>{{ reuniones_count }}</strong> reuniones.{% endif %}
+    </p>
 </div>
 
-{% if current_user.is_authenticated and current_user.has_role("admin") %}
-<h2 class="section-label mb-2">Acciones rápidas</h2>
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
-        <a href="{{ url_for('duenio.create_duenio') }}" class="quick text-decoration-none">
-            <div class="stat-icon tone-brand"><span class="material-symbols-outlined">person_add</span></div>
-            <div><strong>Nuevo propietario</strong><span>Registrar en el sistema</span></div>
-        </a>
-    </div>
-    <div class="col-6 col-lg-3">
-        <a href="{{ url_for('terreno.create_terreno') }}" class="quick text-decoration-none">
-            <div class="stat-icon tone-success"><span class="material-symbols-outlined">add_location_alt</span></div>
-            <div><strong>Nuevo terreno</strong><span>Asignar lote a propietario</span></div>
-        </a>
-    </div>
-    <div class="col-6 col-lg-3">
-        <a href="{{ url_for('reunion.create_reunion') }}" class="quick text-decoration-none">
-            <div class="stat-icon tone-warning"><span class="material-symbols-outlined">event_available</span></div>
-            <div><strong>Nueva reunión</strong><span>Programar asamblea</span></div>
-        </a>
-    </div>
-    <div class="col-6 col-lg-3">
-        <a href="{{ url_for('cuota.create_cuota') }}" class="quick text-decoration-none">
-            <div class="stat-icon tone-info"><span class="material-symbols-outlined">payments</span></div>
-            <div><strong>Nueva cuota</strong><span>Aplicar aporte a terrenos</span></div>
-        </a>
-    </div>
+{% if alertas and (alertas.roles_invalidos or alertas.sin_terreno) %}
+<div class="alertas">
+    {% if alertas.roles_invalidos %}
+    <a class="alerta" href="{{ url_for('user.list_users') }}">
+        {{ icono('shield_person') }}
+        <span><strong>{{ alertas.roles_invalidos }}</strong> cuentas tienen un rol que no es administrador ni consulta. Revísalas.</span>
+    </a>
+    {% endif %}
+    {% if alertas.sin_terreno %}
+    <a class="alerta" href="{{ url_for('duenio.list_duenios') }}">
+        {{ icono('person_off') }}
+        <span><strong>{{ alertas.sin_terreno }}</strong> propietarios no tienen terrenos asignados.</span>
+    </a>
+    {% endif %}
 </div>
 {% endif %}
 
-<h2 class="section-label mb-2">Directorio de propietarios</h2>
-<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
-    <md-elevation></md-elevation>
-
-    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <form method="GET" action="{{ url_for('user.index') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" name="search" class="form-control border-start-0" placeholder="Buscar por nombre o CI..." value="{{ search or '' }}">
+<div class="hoja panel-inicio">
+    <section aria-labelledby="titulo-plano">
+        <div class="plano-cabeza">
+            <div>
+                <h2 id="titulo-plano">Plano de manzanos</h2>
+                <p>Cada cuadro es un manzano. El verde muestra qué parte de sus cuotas ya se pagó.</p>
             </div>
-            <md-filled-button type="submit">Buscar</md-filled-button>
-            {% if search %}
-            <a href="{{ url_for('user.index') }}" class="text-decoration-none">
-                <md-outlined-button type="button">Limpiar</md-outlined-button>
-            </a>
+        </div>
+        {% if plano %}
+        <div class="plano animar">
+            {% for m in plano %}
+                {% set p = m.porcentaje %}
+                {% set texto = 'Manzano ' ~ m.manzano ~ ': ' ~ m.terrenos ~ (' terreno' if m.terrenos == 1 else ' terrenos') ~
+                               (', ' ~ m.pagadas ~ ' de ' ~ m.cuotas ~ ' cuotas pagadas (' ~ p ~ ' %)' if p is not none else ', sin cuotas emitidas') %}
+                {% set clases = 'parcela' ~ (' sin-datos' if p is none else '') ~ (' alta' if p is not none and p >= 55 else '') %}
+                {% if autenticado %}
+                <a class="{{ clases }}" href="{{ url_for('terreno.list_terrenos', manzano=m.manzano) }}" title="{{ texto }}" aria-label="{{ texto }}" style="--p: {{ p or 0 }}%; --i: {{ loop.index0 }}">
+                {% else %}
+                <div class="{{ clases }}" title="{{ texto }}" role="img" aria-label="{{ texto }}" style="--p: {{ p or 0 }}%; --i: {{ loop.index0 }}">
+                {% endif %}
+                    <span class="parcela-relleno"></span>
+                    <span class="parcela-numero">{{ m.manzano }}</span>
+                {% if autenticado %}</a>{% else %}</div>{% endif %}
+            {% endfor %}
+        </div>
+        <div class="leyenda" aria-hidden="true">
+            <span><i style="--p: 0%"></i>Nada pagado</span>
+            <span><i style="--p: 50%"></i>La mitad</span>
+            <span><i style="--p: 100%"></i>Todo pagado</span>
+            {% if autenticado %}<span>Toca un manzano para ver sus terrenos.</span>{% endif %}
+        </div>
+        {% else %}
+        {{ vacio('Todavía no hay terrenos registrados', 'Cuando se registren terrenos, aquí aparecerá el plano de manzanos.') }}
+        {% endif %}
+    </section>
+
+    <section aria-label="Aportes y reuniones">
+        <div class="bloque">
+            <h2>Aportes</h2>
+            {% for e in emisiones[:2] %}
+            <div class="cifras{{ ' bloque' if not loop.first else '' }}">
+                <span class="tenue">{{ e.titulo }}</span>
+                <span class="cifra-grande num">{{ e.porcentaje|round|int }} %</span>
+                <span>{{ e.pagadas|entero }} de {{ e.total|entero }} cuotas pagadas</span>
+                <div class="barra-progreso" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ e.porcentaje }}" aria-label="Avance de {{ e.titulo }}">
+                    <span style="width: {{ e.porcentaje }}%"></span>
+                </div>
+                {% if autenticado %}
+                <span class="tenue num">Bs {{ e.monto_pagado|bs }} recaudados de Bs {{ e.monto_total|bs }}</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="tenue">Aún no se emitió ninguna cuota.</p>
+            {% endfor %}
+        </div>
+
+        <div class="bloque">
+            <h2>Reuniones</h2>
+            {% if proxima %}
+            <div class="fecha-reunion">
+                <span class="dia" aria-hidden="true"><strong>{{ proxima.fecha.day }}</strong><small>{{ proxima.fecha|mes_corto }}</small></span>
+                <div>
+                    <strong>{{ proxima.descripcion or 'Reunión de la junta' }}</strong>
+                    <span class="celda-secundaria">Próxima: {{ proxima.fecha|fecha_larga }}, {{ proxima.hora.strftime('%H:%M') }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="tenue">No hay reuniones programadas.</p>
             {% endif %}
-        </form>
-        <span class="text-muted small">{{ duenos_paginated.total if duenos_paginated else 0 }} propietarios registrados</span>
+            {% if ultimas %}
+            <ul class="lista-simple" style="margin-top: 12px">
+                {% for r in ultimas %}
+                <li>
+                    <span>{{ r.descripcion or 'Reunión' }}<span class="celda-secundaria">{{ r.fecha|fecha }}</span></span>
+                    <span class="tenue num">{{ presentes.get(r.id, 0) }} presentes</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <p style="margin-top: 10px"><a href="{{ url_for('reunion.list_reuniones') }}">Ver todas las reuniones</a></p>
+        </div>
+    </section>
+</div>
+
+<div class="hoja" style="margin-top: 28px">
+    <div class="hoja-cabeza">
+        <div>
+            <h2>Directorio de propietarios</h2>
+            <p>Busca por nombre o apellido, en cualquier orden.{% if not autenticado %} El CI se muestra parcialmente.{% endif %}</p>
+        </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="propietariosTable">
+    {% call filtros() %}
+        {{ buscador('buscar-directorio', url_for('busqueda.buscar_propietarios'), 'Buscar en el directorio', valor=search,
+                    placeholder='Ej.: Ana Pruebas', etiqueta_visible=False) }}
+        {% if search %}<a class="filtro-activo" href="{{ url_con(search=None, page=None) }}">“{{ search }}” {{ icono('close') }}<span class="sr-only">Quitar búsqueda</span></a>{% endif %}
+    {% endcall %}
+
+    {% if duenos_paginated.items %}
+    <div class="tabla-marco">
+        <table class="tabla">
             <thead>
                 <tr>
-                    <th class="ps-3">Propietario</th>
+                    {{ th_orden('Propietario', 'nombre', orden) }}
                     <th>CI</th>
-                    <th>Consultas rápidas</th>
-                    <th class="text-end pe-3">Multas pendientes</th>
+                    <th class="derecha">Terrenos</th>
+                    <th>Situación</th>
+                    {% if autenticado %}<th class="acciones"><span class="sr-only">Acciones</span></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% for dueno in duenos_paginated.items %}
-                {% set nombre_completo = dueno.nombre ~ ' ' ~ (dueno.paterno or '') ~ ' ' ~ (dueno.materno or '') %}
-                {% set m_total = multas(dueno.multas) %}
+            {% for d in duenos_paginated.items %}
+                {% set deuda = deudas.get(d.id, {}).get('total', 0) %}
                 <tr>
-                    <td class="ps-3">
-                        <div class="person">
-                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
-                                {{ initials(dueno.nombre, dueno.paterno) }}
-                            </div>
-                            <div class="person-name fw-medium">{{ nombre_completo }}</div>
-                        </div>
+                    <td class="celda-titulo">{{ persona(d, url_for('reporte.estado_cuenta_imprimible', duenio_id=d.id) if autenticado else None) }}</td>
+                    <td data-label="CI" class="num">{{ d.ci if autenticado else d.ci_enmascarado }}</td>
+                    <td data-label="Terrenos" class="derecha num">{{ lotes.get(d.id, 0) }}</td>
+                    <td data-label="Situación">
+                        {% if d.es_immune %}<span class="estado estado-info">Entidad de la junta</span>
+                        {% elif deuda > 0 %}<span class="estado estado-deuda">{% if autenticado %}Debe Bs {{ deuda|bs }}{% else %}Con deuda pendiente{% endif %}</span>
+                        {% else %}<span class="estado estado-ok">Al día</span>{% endif %}
                     </td>
-                    <td class="num">{{ dueno.ci }}</td>
-                    <td>
-                        <div class="d-flex flex-wrap gap-1">
-                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="asistencias"
-                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
-                                <i class="fas fa-calendar-check me-1"></i>Asistencias
-                            </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="terrenos"
-                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
-                                <i class="fas fa-map me-1"></i>Terrenos
-                            </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="cuotas"
-                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
-                                <i class="fas fa-money-bill-wave me-1"></i>Cuotas
-                            </button>
-                        </div>
+                    {% if autenticado %}
+                    <td class="acciones">
+                        {% call menu_acciones('Acciones para ' ~ d.nombre_completo) %}
+                            <a class="menu-item" role="menuitem" href="{{ url_for('reporte.estado_cuenta_imprimible', duenio_id=d.id) }}">{{ icono('request_quote') }}Estado de cuenta</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('terreno.list_terrenos', search=d.nombre_completo) }}">{{ icono('fence') }}Ver terrenos</a>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('multa.multas_por_duenio', duenio_id=d.id) }}">{{ icono('gavel') }}Ver multas</a>
+                            {% if es_admin %}
+                            <div class="menu-separador"></div>
+                            <a class="menu-item" role="menuitem" href="{{ url_for('duenio.update_duenio', id=d.id) }}">{{ icono('edit') }}Editar datos</a>
+                            {% endif %}
+                        {% endcall %}
                     </td>
-                    <td class="text-end num pe-3">
-                        {% if m_total and m_total|string not in ('0', '0.0', '0.00') %}
-                        <span class="chip tone-danger fw-bold">Bs. {{ m_total }}</span>
-                        {% else %}
-                        <span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Al día</span>
-                        {% endif %}
-                    </td>
+                    {% endif %}
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4">
-                        {{ empty_state('fa-users',
-                                       'Sin resultados' if search else 'Sin propietarios',
-                                       'No hay propietarios que coincidan con "' ~ search ~ '"' if search else 'Todavía no hay propietarios registrados en el sistema.') }}
-                    </td>
-                </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
-
-    {% if duenos_paginated and duenos_paginated.total > 0 %}
-    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
-        <span class="small text-muted">
-            {{ duenos_paginated.per_page * (duenos_paginated.page - 1) + 1 }}–{{ duenos_paginated.per_page * (duenos_paginated.page - 1) + duenos_paginated.items|length }}
-            de {{ duenos_paginated.total }}{% if search %} · búsqueda: "{{ search }}"{% endif %}
-        </span>
-        {{ pagination(duenos_paginated, 'user.index', search=search) }}
-    </div>
+    {{ paginacion(duenos_paginated, 'propietarios') }}
+    {% elif search %}
+    {{ vacio('Nadie coincide con “' ~ search ~ '”', 'Prueba con solo el nombre o solo un apellido.', url_con(search=None, page=None), 'Ver todo el directorio', 'list') }}
+    {% else %}
+    {{ vacio('El directorio está vacío', 'Todavía no hay propietarios registrados.',
+             url_for('duenio.create_duenio') if es_admin else None, 'Registrar propietario', 'person_add') }}
     {% endif %}
 </div>
-
-<!-- Modal Detalle por propietario (asistencias, terrenos, cuotas) -->
-<div class="modal fade" id="detalleModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title fw-bold" id="detalleTitulo"></h5>
-                    <div class="text-muted small" id="detalleNombre"></div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body p-0" id="detalleBody"></div>
-            <div class="modal-footer justify-content-between" id="detalleFooter"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Información del sistema -->
-<div class="modal fade" id="aboutSystemModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Sistema de Gestión Comunitaria</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted">Plataforma oficial desarrollada para la administración y rendición de cuentas de la Junta de Vecinos Circuata.</p>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <div class="person align-items-start">
-                            <div class="stat-icon tone-brand"><i class="fas fa-users"></i></div>
-                            <div><div class="person-name">Propietarios</div><div class="person-meta small">Registro civil, cédulas e historial general.</div></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="person align-items-start">
-                            <div class="stat-icon tone-success"><i class="fas fa-map-marked-alt"></i></div>
-                            <div><div class="person-name">Terrenos</div><div class="person-meta small">Lotes, manzanas y superficie cuadrada.</div></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="person align-items-start">
-                            <div class="stat-icon tone-warning"><i class="fas fa-calendar-alt"></i></div>
-                            <div><div class="person-name">Reuniones</div><div class="person-meta small">Asambleas, control de asistencia y multas.</div></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="person align-items-start">
-                            <div class="stat-icon tone-info"><i class="fas fa-money-bill-wave"></i></div>
-                            <div><div class="person-name">Cuotas y Aportes</div><div class="person-meta small">Emisión y control de pagos y aportes.</div></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    (function () {
-        var modalEl = document.getElementById('detalleModal');
-        var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
-
-        function esc(v) {
-            var d = document.createElement('div');
-            d.textContent = v == null ? '' : String(v);
-            return d.innerHTML;
-        }
-
-        document.querySelectorAll('.btn-detalle').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                var kind = this.getAttribute('data-kind');
-                var id = this.getAttribute('data-id');
-                var nombre = this.getAttribute('data-nombre');
-
-                var titles = {
-                    'asistencias': 'Historial de asistencias',
-                    'terrenos': 'Terrenos registrados',
-                    'cuotas': 'Estado de cuotas'
-                };
-
-                document.getElementById('detalleTitulo').textContent = titles[kind] || 'Detalle';
-                document.getElementById('detalleNombre').textContent = nombre;
-                var body = document.getElementById('detalleBody');
-                var foot = document.getElementById('detalleFooter');
-
-                body.innerHTML = '<div class="p-4 text-center"><div class="spinner-border text-primary spinner-border-sm me-2"></div>Cargando información...</div>';
-                foot.innerHTML = '';
-                if (modal) modal.show();
-
-                try {
-                    var res = await fetch('/api/dueno/' + id + '/' + kind);
-                    var data = await res.json();
-
-                    if (!data.success) {
-                        body.innerHTML = '<div class="alert alert-danger m-3">Error: ' + esc(data.error) + '</div>';
-                        return;
-                    }
-
-                    if (kind === 'asistencias') {
-                        var rows = (data.asistencias || []).map(function (a) {
-                            var chip = a.presente
-                                ? '<span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Presente</span>'
-                                : '<span class="chip tone-danger"><i class="fas fa-times-circle me-1"></i>Ausente (Bs. ' + (a.multa_monto || 0) + ')</span>';
-                            return '<tr>' +
-                                '<td class="ps-3"><div class="fw-semibold">' + esc(a.reunion.tema) + '</div></td>' +
-                                '<td>' + esc(a.reunion.fecha) + ' ' + esc(a.reunion.hora) + '</td>' +
-                                '<td class="pe-3">' + chip + '</td>' +
-                                '</tr>';
-                        }).join('');
-
-                        body.innerHTML = rows
-                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Reunión</th><th>Fecha</th><th class="pe-3">Asistencia</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                            : '<div class="p-4 text-center text-muted">Sin asistencias registradas.</div>';
-                    } else if (kind === 'terrenos') {
-                        var rows = (data.terrenos || []).map(function (t) {
-                            return '<tr>' +
-                                '<td class="ps-3 fw-semibold">' + esc(t.numero_lote) + '</td>' +
-                                '<td>' + esc(t.ubicacion) + '</td>' +
-                                '<td class="pe-3 num">' + esc(t.superficie) + ' m²</td>' +
-                                '</tr>';
-                        }).join('');
-
-                        body.innerHTML = rows
-                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Lote</th><th>Ubicación</th><th class="pe-3">Superficie</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                            : '<div class="p-4 text-center text-muted">Sin terrenos asociados.</div>';
-                    } else if (kind === 'cuotas') {
-                        var rows = (data.cuotas || []).map(function (c) {
-                            var chip = c.estado === 'pagado'
-                                ? '<span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Pagada</span>'
-                                : '<span class="chip tone-warning"><i class="fas fa-clock me-1"></i>Pendiente</span>';
-                            return '<tr>' +
-                                '<td class="ps-3 fw-semibold">' + esc(c.descripcion) + '</td>' +
-                                '<td class="num">Bs. ' + Number(c.monto).toFixed(2) + '</td>' +
-                                '<td>' + chip + '</td>' +
-                                '<td class="pe-3 text-muted small">' + esc(c.fecha_vencimiento) + '</td>' +
-                                '</tr>';
-                        }).join('');
-
-                        body.innerHTML = rows
-                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Concepto</th><th>Monto</th><th>Estado</th><th class="pe-3">Fecha</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                            : '<div class="p-4 text-center text-muted">Sin cuotas registradas.</div>';
-                    }
-                } catch (e) {
-                    body.innerHTML = '<div class="alert alert-danger m-3">Error de conexión: ' + esc(e.message) + '</div>';
-                }
-            });
-        });
-    })();
-</script>
 {% endblock %}

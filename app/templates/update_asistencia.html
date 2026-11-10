@@ -1,70 +1,32 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import page_header %}
-
-{% block title %}Editar asistencia · Junta de Vecinos Circuata{% endblock %}
+{% from '_macros.html' import cabecera, pie_formulario, persona %}
 
 {% block content %}
-<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
-    {% call page_header('Editar asistencia', 'Modifica el estado de presencia del propietario', 'fa-edit') %}{% endcall %}
+{{ cabecera('Editar asistencia', None, volver=url_for('asistencia.list_asistencias'), volver_texto='Asistencias') }}
 
-    <div class="md3-card" style="position: relative;">
-        <md-elevation></md-elevation>
-
-        <form method="post" id="updateAsistenciaForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                    <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">person</span>
-                        Propietario
-                    </label>
-                    <select id="duenio_id" name="duenio_id" class="form-select" disabled>
-                        {% for duenio in duenios %}
-                        <option value="{{ duenio.id }}" {% if duenio.id == asistencia.duenio_id %}selected{% endif %}>
-                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="id_reunion" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">calendar_today</span>
-                        Reunión
-                    </label>
-                    <select id="id_reunion" name="id_reunion" class="form-select" disabled>
-                        {% for reunion in reuniones %}
-                        <option value="{{ reunion.id }}" {% if reunion.id == asistencia.id_reunion %}selected{% endif %}>
-                            {{ reunion.fecha }} {{ reunion.hora }} · {{ reunion.descripcion if reunion.descripcion else 'Sin descripción' }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-
-            <div class="p-3 rounded mb-4" style="background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem;">
-                <md-checkbox id="asistio" name="asistio" value="true" touch-target="wrapper" {% if asistencia.asistio %}checked{% endif %}></md-checkbox>
-                <label for="asistio" class="mb-0 user-select-none" style="cursor: pointer;">
-                    <div class="fw-semibold">¿Asistió a la reunión?</div>
-                    <div class="small mt-1">
-                        {% if asistencia.asistio %}
-                        <span class="text-success fw-medium"><i class="fas fa-check-circle me-1"></i>Actualmente: presente</span>
-                        {% else %}
-                        <span class="text-danger fw-medium"><i class="fas fa-times-circle me-1"></i>Actualmente: ausente</span>
-                        {% endif %}
-                    </div>
-                </label>
-            </div>
-
-            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a href="{{ url_for('asistencia.list_asistencias') }}" class="text-decoration-none">
-                    <md-text-button type="button">Cancelar</md-text-button>
-                </a>
-                <md-filled-button type="submit">
-                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
-                    Actualizar asistencia
-                </md-filled-button>
-            </div>
-        </form>
+<form method="post" class="hoja formulario" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="volver" value="{{ url_for('asistencia.list_asistencias', reunion_id=asistencia.id_reunion) }}">
+    <div class="ficha">
+        <div><span>Propietario</span>{{ persona(asistencia.dueno, None, 'CI ' ~ asistencia.dueno.ci if asistencia.dueno else '') }}</div>
+        <div><span>Reunión</span><strong>{{ asistencia.reunion.fecha|fecha }}</strong><span>{{ asistencia.reunion.descripcion or 'Sin tema' }}</span></div>
     </div>
-</div>
+    <div class="hoja-cuerpo" style="border-top: 1px solid var(--linea-suave)">
+        <div class="campo">
+            <span class="campo-etiqueta" id="etiqueta-asistio">¿Asistió?</span>
+            <div class="alternador" role="radiogroup" aria-labelledby="etiqueta-asistio">
+                <input type="radio" id="asistio-si" name="asistio" value="true"{% if asistencia.asistio %} checked{% endif %}>
+                <label for="asistio-si" class="op-ok">Presente</label>
+                <input type="radio" id="asistio-no" name="asistio" value="false"{% if not asistencia.asistio %} checked{% endif %}>
+                <label for="asistio-no" class="op-deuda">Ausente</label>
+            </div>
+            <p class="ayuda">
+                {% if asistencia.dueno and asistencia.dueno.es_immune %}Este propietario está exento de multas.
+                {% elif asistencia.reunion.monto_multa %}Ausente aplica una multa de Bs {{ asistencia.reunion.monto_multa|bs }}; presente la quita.
+                {% else %}Esta reunión no tiene multa por inasistencia.{% endif %}
+            </p>
+        </div>
+    </div>
+    {{ pie_formulario(url_for('asistencia.list_asistencias'), 'Guardar asistencia') }}
+</form>
 {% endblock %}

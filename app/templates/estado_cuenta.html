@@ -1,155 +1,102 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Estado de Cuenta · {{ duenio.nombre }} {{ duenio.paterno or '' }} · Junta de Vecinos Circuata</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <style>
-        body { font-family: 'Roboto', sans-serif; background: #f8f9fa; color: #212529; font-size: 0.92rem; }
-        .print-container { max-width: 800px; margin: 2rem auto; background: #fff; padding: 2.5rem; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .header-brand { border-bottom: 2px solid #1f4e78; padding-bottom: 1rem; margin-bottom: 1.5rem; }
-        .table-custom th { background: #f1f4f9; font-size: 0.8rem; text-transform: uppercase; color: #495057; }
-        .num { font-variant-numeric: tabular-nums; }
-        @media print {
-            body { background: #fff; }
-            .print-container { margin: 0; padding: 0; border: none; box-shadow: none; max-width: 100%; }
-            .no-print { display: none !important; }
-        }
-    </style>
-</head>
-<body>
-<div class="print-container">
-    <div class="d-flex justify-content-between align-items-center no-print mb-4 p-2 bg-light rounded border">
-        <a href="{{ url_for('duenio.list_duenios') }}" class="btn btn-sm btn-outline-secondary">← Volver al sistema</a>
-        <button onclick="window.print()" class="btn btn-sm btn-primary">🖨️ Imprimir / Guardar como PDF</button>
-    </div>
+{% extends 'base.html' %}
+{% from '_macros.html' import icono, cabecera %}
 
-    <div class="header-brand d-flex justify-content-between align-items-center">
-        <div>
-            <h2 class="h4 fw-bold text-primary mb-0">JUNTA DE VECINOS CIRCUATA</h2>
-            <div class="text-muted small">Estado de Cuenta y Ficha Comunitaria Oficial</div>
-        </div>
-        <div class="text-end text-muted small">
-            <div>Emisión: {{ fecha_emision }}</div>
-            <div class="fw-bold">Ficha N°: {{ duenio.id }}-{{ duenio.ci }}</div>
-        </div>
-    </div>
+{% block title %}Estado de cuenta de {{ duenio.nombre_completo }}{% endblock %}
 
-    <!-- Datos del Propietario -->
-    <div class="card mb-4 bg-light border-0">
-        <div class="card-body p-3">
-            <h6 class="fw-bold text-uppercase text-muted small mb-2">Datos del Propietario</h6>
-            <div class="row">
-                <div class="col-sm-6"><strong>Nombre completo:</strong> {{ duenio.nombre }} {{ duenio.paterno or '' }} {{ duenio.materno or '' }}</div>
-                <div class="col-sm-6"><strong>Cédula de Identidad (CI):</strong> {{ duenio.ci }}</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Terrenos asociados -->
-    <h6 class="fw-bold text-uppercase text-muted small mb-2">Terrenos y Lotes Registrados ({{ terrenos|length }})</h6>
-    <table class="table table-sm table-bordered table-custom mb-4">
-        <thead>
-            <tr>
-                <th>Lote / Ubicación</th>
-                <th>Manzano</th>
-                <th class="text-end">Superficie</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in terrenos %}
-            <tr>
-                <td>Lote {{ t.lugar }}</td>
-                <td>Manzano {{ t.manzano }}</td>
-                <td class="text-end num">{{ t.metros_cuadrados }} m²</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="3" class="text-muted">Sin terrenos asociados.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Cuotas pendientes -->
-    <h6 class="fw-bold text-uppercase text-muted small mb-2">Cuotas y Aportes Pendientes</h6>
-    <table class="table table-sm table-bordered table-custom mb-4">
-        <thead>
-            <tr>
-                <th>Concepto</th>
-                <th>Terreno</th>
-                <th>Fecha Emisión</th>
-                <th class="text-end">Monto Adeudado</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in cuotas_pendientes %}
-            <tr>
-                <td>{{ c.titulo }}</td>
-                <td>Lote {{ c.terreno.lugar }}</td>
-                <td>{{ c.fecha_creacion.strftime('%d/%m/%Y') if c.fecha_creacion else 'N/A' }}</td>
-                <td class="text-end num text-danger fw-bold">Bs. {{ '%.2f'|format(c.monto) }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" class="text-success">✓ No registra cuotas pendientes de pago.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Multas pendientes -->
-    <h6 class="fw-bold text-uppercase text-muted small mb-2">Sanciones y Multas Registradas</h6>
-    <table class="table table-sm table-bordered table-custom mb-4">
-        <thead>
-            <tr>
-                <th>Tipo</th>
-                <th>Detalle</th>
-                <th>Fecha</th>
-                <th class="text-end">Monto Sanción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in multas %}
-            <tr>
-                <td>{{ 'Inasistencia a reunión' if m.tipo == 'asistencia' else 'Cuota pendiente' if m.tipo == 'cuota' else m.tipo }}</td>
-                <td>{{ m.descripcion or 'Sin observaciones' }}</td>
-                <td>{{ m.fecha.strftime('%d/%m/%Y') if m.fecha else 'N/A' }}</td>
-                <td class="text-end num text-danger fw-bold">Bs. {{ '%.2f'|format(m.monto) }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" class="text-success">✓ Sin multas registradas al día de la fecha.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Resumen de saldo -->
-    <div class="p-3 border rounded mb-5 bg-light">
-        <div class="row align-items-center">
-            <div class="col-8">
-                <h5 class="mb-0 fw-bold">SALDO TOTAL LIQUIDABLE</h5>
-                <div class="text-muted small">Incluye cuotas pendientes y multas acumuladas</div>
-            </div>
-            <div class="col-4 text-end">
-                <span class="fs-4 fw-bold num {{ 'text-danger' if total_adeudado > 0 else 'text-success' }}">
-                    Bs. {{ '%.2f'|format(total_adeudado) }}
-                </span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firmas -->
-    <div class="row pt-4 text-center">
-        <div class="col-6">
-            <div style="border-top: 1px dashed #6c757d; width: 80%; margin: 0 auto; padding-top: 0.5rem;">
-                <small class="text-muted">Firma y Sello Mesa Directiva</small>
-            </div>
-        </div>
-        <div class="col-6">
-            <div style="border-top: 1px dashed #6c757d; width: 80%; margin: 0 auto; padding-top: 0.5rem;">
-                <small class="text-muted">Firma de Conformidad del Propietario</small>
-            </div>
-        </div>
-    </div>
+{% block content %}
+<div class="no-imprimir">
+{% call cabecera('Estado de cuenta', duenio.nombre_completo, volver=url_for('duenio.list_duenios'), volver_texto='Propietarios') %}
+    <a class="boton" href="{{ url_for('multa.multas_por_duenio', duenio_id=duenio.id) }}">{{ icono('gavel') }}Ver multas</a>
+    <button type="button" class="boton boton-principal" onclick="window.print()">{{ icono('print') }}Imprimir o guardar en PDF</button>
+{% endcall %}
 </div>
-</body>
-</html>
 
+<article class="hoja documento">
+    <header class="hoja-cabeza">
+        <div>
+            <h2>Junta de Vecinos Circuata</h2>
+            <p>Estado de cuenta y ficha del propietario</p>
+        </div>
+        <div class="derecha tenue" style="font-size: var(--t-s)">
+            Emitido el {{ fecha_emision }}<br>Ficha {{ duenio.id }}
+        </div>
+    </header>
+
+    <div class="ficha">
+        <div><span>Propietario</span><strong>{{ duenio.nombre_completo }}</strong></div>
+        <div><span>CI</span><strong class="num">{{ duenio.ci }}</strong></div>
+        <div><span>Terrenos</span><strong class="num">{{ terrenos|length }}</strong></div>
+        <div><span>Saldo a pagar</span><strong class="num {{ 'monto-deuda' if total_adeudado > 0 else '' }}">Bs {{ total_adeudado|bs }}</strong></div>
+    </div>
+
+    <section class="documento-seccion">
+        <h3>Terrenos</h3>
+        {% if terrenos %}
+        <table class="tabla">
+            <thead><tr><th>Lote</th><th class="derecha">Manzano</th><th class="derecha">Superficie</th></tr></thead>
+            <tbody>
+            {% for t in terrenos %}
+                <tr>
+                    <td class="celda-titulo">Lote {{ t.lugar }}</td>
+                    <td data-label="Manzano" class="derecha num">{{ t.manzano }}</td>
+                    <td data-label="Superficie" class="derecha num">{{ t.metros_cuadrados|bs }} m²</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="tenue">Sin terrenos asignados.</p>{% endif %}
+    </section>
+
+    <section class="documento-seccion">
+        <h3>Cuotas pendientes</h3>
+        {% if cuotas_pendientes %}
+        <table class="tabla">
+            <thead><tr><th>Concepto</th><th>Terreno</th><th>Emitida</th><th class="derecha">Monto</th></tr></thead>
+            <tbody>
+            {% for c in cuotas_pendientes %}
+                <tr>
+                    <td class="celda-titulo">{{ c.titulo }}</td>
+                    <td data-label="Terreno">Lote {{ c.terreno.lugar }}</td>
+                    <td data-label="Emitida" class="num">{{ c.fecha_creacion|fecha }}</td>
+                    <td data-label="Monto" class="derecha num">Bs {{ c.monto|bs }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="estado estado-ok">No tiene cuotas pendientes.</p>{% endif %}
+    </section>
+
+    <section class="documento-seccion">
+        <h3>Multas</h3>
+        {% if multas %}
+        <table class="tabla">
+            <thead><tr><th>Motivo</th><th>Detalle</th><th>Fecha</th><th class="derecha">Monto</th></tr></thead>
+            <tbody>
+            {% for m in multas %}
+                <tr>
+                    <td class="celda-titulo">{{ 'Inasistencia' if m.tipo == 'asistencia' else 'Manual' }}</td>
+                    <td data-label="Detalle">{{ m.descripcion or 'Sin detalle' }}</td>
+                    <td data-label="Fecha" class="num">{{ m.fecha|fecha }}</td>
+                    <td data-label="Monto" class="derecha num">Bs {{ m.monto|bs }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="estado estado-ok">No tiene multas.</p>{% endif %}
+        <p class="ayuda" style="margin-top: 8px">Las cuotas impagas se cobran una sola vez, en la tabla de cuotas pendientes.</p>
+    </section>
+
+    <section class="documento-seccion documento-total">
+        <div>
+            <strong>Saldo a pagar</strong>
+            <span class="tenue">Cuotas pendientes Bs {{ (total_adeudado - total_multas)|bs }} más multas Bs {{ total_multas|bs }}</span>
+        </div>
+        <strong class="cifra-grande num {{ 'monto-deuda' if total_adeudado > 0 else '' }}">Bs {{ total_adeudado|bs }}</strong>
+    </section>
+
+    <footer class="documento-firmas">
+        <div>Firma y sello de la directiva</div>
+        <div>Firma del propietario</div>
+    </footer>
+</article>
+{% endblock %}
