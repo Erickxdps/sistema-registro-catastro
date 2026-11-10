@@ -723,9 +723,30 @@ input[aria-invalid="true"], .buscador.invalido input { border-color: var(--cerez
 
 .plano {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(auto-fill, 30px);
+    justify-content: start;
+    gap: 4px;
 }
+.cifras-inicio {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0;
+    margin-bottom: 22px;
+    border: 1px solid var(--linea);
+    border-radius: var(--r-hoja);
+    background: var(--hoja-papel);
+    overflow: hidden;
+}
+.cifras-inicio > div {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 14px 16px;
+    border-right: 1px solid var(--linea-suave);
+    border-bottom: 1px solid var(--linea-suave);
+    min-width: 0;
+}
+.cifras-inicio span { font-size: var(--t-xs); color: var(--tenue); }
+.cifras-inicio strong { font-size: 1.35rem; font-family: var(--f-titulo); font-weight: 600; line-height: 1.2; }
+.cifras-inicio small { font-size: var(--t-xs); color: var(--tenue); }
 .parcela {
     position: relative;
     aspect-ratio: 1;

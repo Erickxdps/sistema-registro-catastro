@@ -16,6 +16,20 @@
     </p>
 </div>
 
+<div class="cifras-inicio" aria-label="Cifras generales">
+    <div><span>Propietarios</span><strong class="num">{{ estadisticas.propietarios|entero }}</strong></div>
+    <div><span>Terrenos</span><strong class="num">{{ estadisticas.terrenos|entero }}</strong><small>en {{ estadisticas.manzanos }} manzanos</small></div>
+    <div><span>Superficie registrada</span><strong class="num">{{ estadisticas.superficie|entero }} m²</strong></div>
+    <div><span>Reuniones</span><strong class="num">{{ estadisticas.reuniones|entero }}</strong></div>
+    <div><span>Propietarios al día</span><strong class="num">{{ estadisticas.propietarios_al_dia|entero }}</strong><small>{{ estadisticas.propietarios_con_cuotas|entero }} con cuotas pendientes</small></div>
+    <div><span>Cuotas pagadas</span><strong class="num">{{ estadisticas.cuotas_pagadas_pct if estadisticas.cuotas_pagadas_pct is not none else '—' }}{% if estadisticas.cuotas_pagadas_pct is not none %} %{% endif %}</strong></div>
+    <div><span>Asistencia promedio</span><strong class="num">{{ estadisticas.asistencia_pct if estadisticas.asistencia_pct is not none else '—' }}{% if estadisticas.asistencia_pct is not none %} %{% endif %}</strong></div>
+    {% if estadisticas.recaudado is defined %}
+    <div><span>Recaudado</span><strong class="num">Bs {{ estadisticas.recaudado|bs }}</strong></div>
+    <div><span>Pendiente de cobro</span><strong class="num monto-deuda">Bs {{ estadisticas.pendiente|bs }}</strong><small>Multas: Bs {{ estadisticas.multas|bs }}</small></div>
+    {% endif %}
+</div>
+
 {% if alertas and (alertas.roles_invalidos or alertas.sin_terreno) %}
 <div class="alertas">
     {% if alertas.roles_invalidos %}

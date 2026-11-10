@@ -4,6 +4,7 @@
 
 from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
+from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 
 from utils.decorators import role_required
@@ -35,6 +36,44 @@ ORDEN_DIRECTORIO = {
     "registro": [Duenio.id.asc()],
     "-registro": [Duenio.id.desc()],
 }
+
+
+def _estadisticas(autenticado):
+    """Cifras reales de la base para el inicio. Sin sesión solo conteos y
+    porcentajes; los montos en bolivianos se muestran únicamente a usuarios con sesión."""
+    from sqlalchemy import func
+    from models.multa_model import Multa
+
+    propietarios = Duenio.query.count()
+    terrenos = Terreno.query.count()
+    superficie = float(db.session.query(func.coalesce(func.sum(Terreno.metros_cuadrados), 0)).scalar() or 0)
+    manzanos = db.session.query(func.count(func.distinct(Terreno.manzano))).scalar() or 0
+    con_cuotas = (db.session.query(func.count(func.distinct(Terreno.duenio_id)))
+                  .join(Cuota, Cuota.terreno_id == Terreno.id).filter(Cuota.pagado.is_(False)).scalar() or 0)
+    cuotas_total, cuotas_pagadas = db.session.query(
+        func.count(Cuota.cuota_id), func.coalesce(func.sum(case((Cuota.pagado.is_(True), 1), else_=0)), 0)).one()
+    asistencias_total, asistencias_presentes = db.session.query(
+        func.count(Asistencia.id), func.coalesce(func.sum(case((Asistencia.asistio.is_(True), 1), else_=0)), 0)).one()
+    stats = {
+        "propietarios": propietarios,
+        "terrenos": terrenos,
+        "manzanos": manzanos,
+        "superficie": superficie,
+        "reuniones": Reunion.query.count(),
+        "propietarios_al_dia": max(propietarios - con_cuotas, 0),
+        "propietarios_con_cuotas": con_cuotas,
+        "cuotas_pagadas_pct": round(cuotas_pagadas / cuotas_total * 100) if cuotas_total else None,
+        "asistencia_pct": round(asistencias_presentes / asistencias_total * 100) if asistencias_total else None,
+    }
+    if autenticado:
+        monto_total, monto_pagado = db.session.query(
+            func.coalesce(func.sum(Cuota.monto), 0),
+            func.coalesce(func.sum(case((Cuota.pagado.is_(True), Cuota.monto), else_=0)), 0)).one()
+        stats["recaudado"] = float(monto_pagado or 0)
+        stats["pendiente"] = float((monto_total or 0) - (monto_pagado or 0))
+        stats["multas"] = float(db.session.query(func.coalesce(func.sum(Multa.monto), 0))
+                                .filter(Multa.filtro_suma_a_deuda()).scalar() or 0)
+    return stats
 
 
 @user_bp.route('/')
@@ -87,6 +126,7 @@ def index():
         cuotas_count=len(emisiones),
         emisiones=emisiones,
         plano=Terreno.plano_manzanos(),
+        estadisticas=_estadisticas(autenticado),
         proxima=proxima,
         ultimas=ultimas,
         presentes=presentes,
