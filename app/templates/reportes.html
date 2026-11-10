@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat %}
+
+{% block title %}Reportes y Exportaciones · Junta de Vecinos Circuata{% endblock %}
+
+{% block content %}
+{% call page_header('Reportes y Exportación', 'Balances financieros, padrón y exportaciones oficiales a Excel', 'fa-chart-pie') %}{% endcall %}
+
+<!-- Indicadores de Balance Financiero -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="md3-card p-3 h-100" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon tone-success"><span class="material-symbols-outlined">payments</span></div>
+                <div>
+                    <div class="text-muted small">Total recaudado</div>
+                    <div class="fs-4 fw-bold text-success num">Bs. {{ '{:,.2f}'.format(monto_recaudado) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="md3-card p-3 h-100" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon tone-warning"><span class="material-symbols-outlined">pending_actions</span></div>
+                <div>
+                    <div class="text-muted small">Cuotas pendientes</div>
+                    <div class="fs-4 fw-bold text-warning num">Bs. {{ '{:,.2f}'.format(monto_pendiente) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="md3-card p-3 h-100" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon tone-danger"><span class="material-symbols-outlined">gavel</span></div>
+                <div>
+                    <div class="text-muted small">Multas acumuladas</div>
+                    <div class="fs-4 fw-bold text-danger num">Bs. {{ '{:,.2f}'.format(monto_multas_total) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="md3-card p-3 h-100" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon tone-brand"><span class="material-symbols-outlined">pie_chart</span></div>
+                <div>
+                    <div class="text-muted small">% Efectividad cobro</div>
+                    <div class="fs-4 fw-bold text-primary num">{{ porcentaje_recaudacion }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progreso de recaudación -->
+<div class="md3-card mb-4" style="position: relative;">
+    <md-elevation></md-elevation>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bold">Progreso general de aportes comunitarios</span>
+        <span class="text-muted small">{{ porcentaje_recaudacion }}% completado (Bs. {{ '{:,.2f}'.format(monto_recaudado) }} de Bs. {{ '{:,.2f}'.format(monto_cuotas_total) }})</span>
+    </div>
+    <div class="progress" style="height: 12px; border-radius: 999px;">
+        <div class="progress-bar bg-success" role="progressbar" style="width: {{ porcentaje_recaudacion }}%;" aria-valuenow="{{ porcentaje_recaudacion }}" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+</div>
+
+<h2 class="section-label mb-3">Descarga de reportes oficiales en Excel (.xlsx)</h2>
+
+<div class="row g-3 mb-4">
+    <!-- Padrón de Propietarios -->
+    <div class="col-md-4">
+        <div class="md3-card h-100 d-flex flex-column justify-content-between" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-primary" style="font-size: 26px;">groups</span>
+                    <h3 class="h6 fw-bold mb-0">Padrón de Propietarios</h3>
+                </div>
+                <p class="text-muted small mb-3">Lista completa de los {{ total_duenios }} propietarios registrados con sus documentos de identidad, lotes asignados y resumen de situación.</p>
+            </div>
+            <a href="{{ url_for('reporte.exportar_duenios') }}" class="text-decoration-none">
+                <md-filled-button class="w-100">
+                    <md-icon slot="icon" class="material-symbols-outlined">download</md-icon>
+                    Descargar Padrón Excel
+                </md-filled-button>
+            </a>
+        </div>
+    </div>
+
+    <!-- Balance de Cuotas -->
+    <div class="col-md-4">
+        <div class="md3-card h-100 d-flex flex-column justify-content-between" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-success" style="font-size: 26px;">receipt_long</span>
+                    <h3 class="h6 fw-bold mb-0">Control de Cuotas</h3>
+                </div>
+                <p class="text-muted small mb-3">Detalle individual de las {{ total_cuotas }} cuotas emitidas con indicación de estado pagado/pendiente, montos y fechas de vencimiento.</p>
+            </div>
+            <a href="{{ url_for('reporte.exportar_cuotas') }}" class="text-decoration-none">
+                <md-filled-button class="w-100">
+                    <md-icon slot="icon" class="material-symbols-outlined">download</md-icon>
+                    Descargar Cuotas Excel
+                </md-filled-button>
+            </a>
+        </div>
+    </div>
+
+    <!-- Registro de Multas -->
+    <div class="col-md-4">
+        <div class="md3-card h-100 d-flex flex-column justify-content-between" style="position: relative;">
+            <md-elevation></md-elevation>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-danger" style="font-size: 26px;">gavel</span>
+                    <h3 class="h6 fw-bold mb-0">Sanciones y Multas</h3>
+                </div>
+                <p class="text-muted small mb-3">Historial de las {{ total_multas }} multas generadas por inasistencia a reuniones o cuotas no canceladas con sus montos acumulados.</p>
+            </div>
+            <a href="{{ url_for('reporte.exportar_multas') }}" class="text-decoration-none">
+                <md-filled-button class="w-100">
+                    <md-icon slot="icon" class="material-symbols-outlined">download</md-icon>
+                    Descargar Multas Excel
+                </md-filled-button>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

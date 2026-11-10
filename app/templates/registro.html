@@ -1,24 +1,59 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Registrar usuario · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5 d-flex justify-content-center">
-    <div class="card shadow-lg p-4" style="max-width: 500px; width: 100%;">
-        <h2 class="h2 text-center mb-4">Registrar Usuario</h2>
-        <form method="post">
+<div class="form-shell" style="max-width: 520px; margin: 0 auto;">
+    {% call page_header('Registrar usuario', 'Crea una cuenta de acceso al sistema', 'fa-user-plus') %}{% endcall %}
+
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
+
+        <form method="post" id="registerForm">
             <div class="mb-3">
-                <label for="username" class="form-label">Nombre de Usuario:</label>
-                <input type="text" id="username" name="username" required class="form-control">
+                <md-outlined-text-field
+                    label="Nombre de usuario"
+                    id="username"
+                    name="username"
+                    required
+                    autofocus
+                    autocomplete="username">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">person</md-icon>
+                </md-outlined-text-field>
             </div>
+
             <div class="mb-3">
-                <label for="password" class="form-label">Contraseña:</label>
-                <input type="password" id="password" name="password" required class="form-control">
+                <md-outlined-text-field
+                    label="Contraseña"
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    autocomplete="new-password">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">lock</md-icon>
+                </md-outlined-text-field>
             </div>
-            <div class="mb-3">
-                <label for="role" class="form-label">Rol:</label>
-                <input type="text" id="role" name="role" required class="form-control">
+
+            <div class="mb-4">
+                <label for="role" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">admin_panel_settings</span>
+                    Rol de usuario
+                </label>
+                <select id="role" name="role" required class="form-select">
+                    <option value="admin">Administrador (admin)</option>
+                    <option value="doctor" selected>Usuario regular (doctor / operador)</option>
+                </select>
             </div>
-            <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Registrar</button>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('user.list_users') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Registrar usuario
+                </md-filled-button>
             </div>
         </form>
     </div>

@@ -1,2221 +1,331 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import stat, initials, empty_state, pagination %}
 
-{% block title %}Sistema de Gestión Comunitaria - Junta Vecinal Circuata{% endblock %}
+{% block title %}Inicio · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="hero-section mb-5">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-lg-6">
-                <div class="hero-content">
-                    <h1 class="hero-title">Junta de Vecinos<br><span class="text-gradient">Circuata</span></h1>
-                    <p class="hero-subtitle">Sistema integral de gestión comunitaria para propietarios y administración de la comunidad</p>
-                    
-                    {% if not current_user.is_authenticated %}
-                    <div class="hero-actions mt-4">
-                        <a href="{{ url_for('user.login') }}" class="btn btn-premium btn-lg me-3">
-                            <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
-                        </a>
-                        <button type="button" class="btn btn-outline-premium btn-lg" data-bs-toggle="modal" data-bs-target="#aboutSystemModal">
-                            <i class="fas fa-info-circle me-2"></i>Conocer Más
-                        </button>
-                    </div>
-                    {% else %}
-                    <div class="hero-actions mt-4">
-                        <a href="{{ url_for('duenio.list_duenios') }}" class="btn btn-premium btn-lg me-3">
-                            <i class="fas fa-tachometer-alt me-2"></i>Panel de Control
-                        </a>
-                        <a href="{{ url_for('user.logout') }}" class="btn btn-outline-danger btn-lg">
-                            <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
+<section class="md3-card mb-4" style="position: relative; overflow: hidden; background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);">
+    <md-elevation></md-elevation>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-primary" style="font-size: 28px;">location_city</span>
+                <span class="badge text-bg-primary">Comunidad Circuata</span>
             </div>
-            <div class="col-lg-6">
-                <div class="hero-stats">
-                    <div class="row g-4">
-                        <div class="col-6">
-                            <div class="stat-card glass-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-users"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <h3 class="stat-number">{{ duenos_count if duenos_count else '0' }}</h3>
-                                    <p class="stat-label">Propietarios</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="stat-card glass-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-map-marked-alt"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <h3 class="stat-number">{{ terrenos_count if terrenos_count else '0' }}</h3>
-                                    <p class="stat-label">Terrenos</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="stat-card glass-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-calendar-alt"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <h3 class="stat-number">{{ reuniones_count if reuniones_count else '0' }}</h3>
-                                    <p class="stat-label">Reuniones</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="stat-card glass-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <h3 class="stat-number">{{ cuotas_count if cuotas_count else '0' }}</h3>
-                                    <p class="stat-label">Aportes</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h1 class="h3 fw-bold mb-1">Junta de Vecinos Circuata</h1>
+            <p class="text-muted mb-0">Gestión integral de propietarios, terrenos, asambleas y aportes comunitarios.</p>
         </div>
-    </div>
-</div>
-
-{% if current_user.is_authenticated %}
-<!-- Panel de Control Rápido -->
-<div class="quick-access-section mb-5">
-    <div class="container">
-        <h2 class="section-title text-center mb-4">
-            <i class="fas fa-bolt me-2"></i>Acceso Rápido
-        </h2>
-        
-        <div class="row g-4">
-            {% if current_user.has_role("admin") %}
-            <div class="col-lg-3 col-md-6">
-                <a href="{{ url_for('duenio.create_duenio') }}" class="quick-card glass-card text-decoration-none">
-                    <div class="quick-icon bg-primary">
-                        <i class="fas fa-user-plus"></i>
-                    </div>
-                    <h4 class="quick-title">Nuevo Propietario</h4>
-                    <p class="quick-description">Registrar un nuevo propietario en el sistema</p>
-                </a>
-            </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <a href="{{ url_for('reunion.create_reunion') }}" class="quick-card glass-card text-decoration-none">
-                    <div class="quick-icon bg-warning">
-                        <i class="fas fa-calendar-plus"></i>
-                    </div>
-                    <h4 class="quick-title">Nueva Reunión</h4>
-                    <p class="quick-description">Programar o registrar una reunión</p>
-                </a>
-            </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <a href="{{ url_for('terreno.create_terreno') }}" class="quick-card glass-card text-decoration-none">
-                    <div class="quick-icon bg-success">
-                        <i class="fas fa-map"></i>
-                    </div>
-                    <h4 class="quick-title">Nuevo Terreno</h4>
-                    <p class="quick-description">Registrar un terreno en el sistema</p>
-                </a>
-            </div>
-            
-            <div class="col-lg-3 col-md-6">
-                <a href="{{ url_for('cuota.create_cuota') }}" class="quick-card glass-card text-decoration-none">
-                    <div class="quick-icon bg-info">
-                        <i class="fas fa-money-bill"></i>
-                    </div>
-                    <h4 class="quick-title">Nueva Cuota</h4>
-                    <p class="quick-description">Crear una cuota para propietarios</p>
-                </a>
-            </div>
+        <div class="d-flex flex-wrap gap-2">
+            {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('user.login') }}" class="text-decoration-none">
+                <md-filled-button>
+                    <md-icon slot="icon" class="material-symbols-outlined">login</md-icon>
+                    Iniciar sesión
+                </md-filled-button>
+            </a>
+            <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#aboutSystemModal">
+                <i class="fas fa-info-circle me-1"></i>Conocer más
+            </button>
+            {% else %}
+            <a href="{{ url_for('duenio.list_duenios') }}" class="text-decoration-none">
+                <md-filled-button>
+                    <md-icon slot="icon" class="material-symbols-outlined">groups</md-icon>
+                    Ver propietarios
+                </md-filled-button>
+            </a>
+            <a href="{{ url_for('user.logout') }}" class="text-decoration-none">
+                <md-outlined-button>
+                    <md-icon slot="icon" class="material-symbols-outlined">logout</md-icon>
+                    Cerrar sesión
+                </md-outlined-button>
+            </a>
             {% endif %}
         </div>
+    </div>
+</section>
+
+<div class="stats mb-4">
+    {{ stat('Propietarios', duenos_count or 0, 'fa-users', 'brand') }}
+    {{ stat('Terrenos registrados', terrenos_count or 0, 'fa-map-marked-alt', 'success') }}
+    {{ stat('Reuniones convocadas', reuniones_count or 0, 'fa-calendar-alt', 'warning') }}
+    {{ stat('Tipos de cuota', cuotas_count or 0, 'fa-money-bill-wave', 'info') }}
+</div>
+
+{% if current_user.is_authenticated and current_user.has_role("admin") %}
+<h2 class="section-label mb-2">Acciones rápidas</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <a href="{{ url_for('duenio.create_duenio') }}" class="quick text-decoration-none">
+            <div class="stat-icon tone-brand"><span class="material-symbols-outlined">person_add</span></div>
+            <div><strong>Nuevo propietario</strong><span>Registrar en el sistema</span></div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{{ url_for('terreno.create_terreno') }}" class="quick text-decoration-none">
+            <div class="stat-icon tone-success"><span class="material-symbols-outlined">add_location_alt</span></div>
+            <div><strong>Nuevo terreno</strong><span>Asignar lote a propietario</span></div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{{ url_for('reunion.create_reunion') }}" class="quick text-decoration-none">
+            <div class="stat-icon tone-warning"><span class="material-symbols-outlined">event_available</span></div>
+            <div><strong>Nueva reunión</strong><span>Programar asamblea</span></div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{{ url_for('cuota.create_cuota') }}" class="quick text-decoration-none">
+            <div class="stat-icon tone-info"><span class="material-symbols-outlined">payments</span></div>
+            <div><strong>Nueva cuota</strong><span>Aplicar aporte a terrenos</span></div>
+        </a>
     </div>
 </div>
 {% endif %}
 
-<!-- Directorio Optimizado de Propietarios -->
-<div class="directory-section mb-5">
-    <div class="container">
-        <div class="section-header d-flex justify-content-between align-items-center mb-4">
-            <h2 class="section-title mb-0">
-                <i class="fas fa-address-book me-2"></i>Directorio de Propietarios
-                <small class="text-muted fs-6 ms-2">({{ duenos_paginated.total if duenos_paginated else 0 }} total)</small>
-            </h2>
-            
-            <div class="search-container">
-                <form method="GET" action="{{ url_for('user.index') }}" class="d-flex align-items-center">
-                    <div class="input-group" style="max-width: 300px;">
-                        <input type="text" 
-                               name="search" 
-                               class="form-control" 
-                               placeholder="Buscar propietario..." 
-                               value="{{ search }}">
-                        <button class="btn btn-outline-success" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                    {% if search %}
-                    <a href="{{ url_for('user.index') }}" class="btn btn-outline-secondary ms-2">
-                        <i class="fas fa-times"></i>
-                    </a>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
-        
-        <div class="directory-table glass-card">
-            <div class="table-responsive">
-                <table class="table table-hover" id="propietariosTable">
-                    <thead class="table-header">
-                        <tr>
-                            <th><i class="fas fa-user me-2"></i>Propietario</th>
-                            <th><i class="fas fa-id-card me-2"></i>CI</th>
-                            <th><i class="fas fa-calendar-check me-2"></i>Asistencias</th>
-                            <th><i class="fas fa-map-marker-alt me-2"></i>Terrenos</th>
-                            <th><i class="fas fa-money-bill-wave me-2"></i>Aportes</th>
-                            <th><i class="fas fa-exclamation-triangle me-2"></i>Multas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for dueno in duenos_paginated.items %}
-                        <tr class="propietario-row">
-                            <td class="propietario-info">
-                                <div class="propietario-details">
-                                    <div class="propietario-name">{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}</div>
-                                    <div class="propietario-status">
-                                        <span class="badge bg-success">Activo</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="ci-info">
-                                <span class="ci-number">{{ dueno.ci }}</span>
-                            </td>
-                            <td>
-                                <button type="button" class="btn btn-info btn-sm action-btn btn-asistencias" 
-                                        data-dueno-id="{{ dueno.id }}" 
-                                        data-dueno-nombre="{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}">
-                                    <i class="fas fa-eye me-1"></i>Ver Asistencias
-                                </button>
-                            </td>
-                            <td>
-                                <button type="button" class="btn btn-success btn-sm action-btn btn-terrenos"
-                                        data-dueno-id="{{ dueno.id }}" 
-                                        data-dueno-nombre="{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}">
-                                    <i class="fas fa-map me-1"></i>Ver Terrenos
-                                </button>
-                            </td>
-                            <td>
-                                <button type="button" class="btn btn-warning btn-sm action-btn btn-cuotas"
-                                        data-dueno-id="{{ dueno.id }}" 
-                                        data-dueno-nombre="{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}">
-                                    <i class="fas fa-money-bill-wave me-1"></i>Ver Aportes
-                                </button>
-                            </td>
-                            <td>
-                                <div class="multas-info">
-                                    <span class="text-danger fw-bold">Bs. {{ multas(dueno.multas) }}</span>
-                                </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-5">
-                                <div class="d-flex flex-column align-items-center">
-                                    <i class="fas fa-users fa-3x mb-3 text-muted opacity-50"></i>
-                                    <h5 class="text-muted">Sin registros</h5>
-                                    <p class="mb-0">
-                                        {% if search %}
-                                            No se encontraron propietarios que coincidan con "{{ search }}"
-                                        {% else %}
-                                            No hay propietarios registrados en el sistema
-                                        {% endif %}
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <!-- Paginación -->
-        {% if duenos_paginated and duenos_paginated.pages > 1 %}
-        <nav aria-label="Navegación de páginas" class="mt-4">
-            <ul class="pagination justify-content-center">
-                <!-- Botón Anterior -->
-                {% if duenos_paginated.has_prev %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('user.index', page=duenos_paginated.prev_num, search=search) }}">
-                        <i class="fas fa-chevron-left"></i> Anterior
-                    </a>
-                </li>
-                {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link"><i class="fas fa-chevron-left"></i> Anterior</span>
-                </li>
-                {% endif %}
+<h2 class="section-label mb-2">Directorio de propietarios</h2>
+<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
+    <md-elevation></md-elevation>
 
-                <!-- Números de página -->
-                {% for page_num in duenos_paginated.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                    {% if page_num %}
-                        {% if page_num != duenos_paginated.page %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('user.index', page=page_num, search=search) }}">{{ page_num }}</a>
-                        </li>
+    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <form method="GET" action="{{ url_for('user.index') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
+                <input type="text" name="search" class="form-control border-start-0" placeholder="Buscar por nombre o CI..." value="{{ search or '' }}">
+            </div>
+            <md-filled-button type="submit">Buscar</md-filled-button>
+            {% if search %}
+            <a href="{{ url_for('user.index') }}" class="text-decoration-none">
+                <md-outlined-button type="button">Limpiar</md-outlined-button>
+            </a>
+            {% endif %}
+        </form>
+        <span class="text-muted small">{{ duenos_paginated.total if duenos_paginated else 0 }} propietarios registrados</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="propietariosTable">
+            <thead>
+                <tr>
+                    <th class="ps-3">Propietario</th>
+                    <th>CI</th>
+                    <th>Consultas rápidas</th>
+                    <th class="text-end pe-3">Multas pendientes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dueno in duenos_paginated.items %}
+                {% set nombre_completo = dueno.nombre ~ ' ' ~ (dueno.paterno or '') ~ ' ' ~ (dueno.materno or '') %}
+                {% set m_total = multas(dueno.multas) %}
+                <tr>
+                    <td class="ps-3">
+                        <div class="person">
+                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
+                                {{ initials(dueno.nombre, dueno.paterno) }}
+                            </div>
+                            <div class="person-name fw-medium">{{ nombre_completo }}</div>
+                        </div>
+                    </td>
+                    <td class="num">{{ dueno.ci }}</td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="asistencias"
+                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
+                                <i class="fas fa-calendar-check me-1"></i>Asistencias
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="terrenos"
+                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
+                                <i class="fas fa-map me-1"></i>Terrenos
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-detalle py-1 px-2" data-kind="cuotas"
+                                    data-id="{{ dueno.id }}" data-nombre="{{ nombre_completo }}">
+                                <i class="fas fa-money-bill-wave me-1"></i>Cuotas
+                            </button>
+                        </div>
+                    </td>
+                    <td class="text-end num pe-3">
+                        {% if m_total and m_total|string not in ('0', '0.0', '0.00') %}
+                        <span class="chip tone-danger fw-bold">Bs. {{ m_total }}</span>
                         {% else %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ page_num }}</span>
-                        </li>
+                        <span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Al día</span>
                         {% endif %}
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">…</span>
-                    </li>
-                    {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">
+                        {{ empty_state('fa-users',
+                                       'Sin resultados' if search else 'Sin propietarios',
+                                       'No hay propietarios que coincidan con "' ~ search ~ '"' if search else 'Todavía no hay propietarios registrados en el sistema.') }}
+                    </td>
+                </tr>
                 {% endfor %}
-
-                <!-- Botón Siguiente -->
-                {% if duenos_paginated.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('user.index', page=duenos_paginated.next_num, search=search) }}">
-                        Siguiente <i class="fas fa-chevron-right"></i>
-                    </a>
-                </li>
-                {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">Siguiente <i class="fas fa-chevron-right"></i></span>
-                </li>
-                {% endif %}
-            </ul>
-            
-            <!-- Selector de registros por página -->
-            <div class="d-flex justify-content-center mt-3">
-                <form method="GET" action="{{ url_for('user.index') }}" class="d-flex align-items-center">
-                    <input type="hidden" name="search" value="{{ search }}">
-                    <label class="form-label mb-0 me-2">Mostrar:</label>
-                    <select name="per_page" class="form-select form-select-sm me-2" style="width: auto;" onchange="this.form.submit()">
-                        <option value="10" {% if request.args.get('per_page', '10') == '10' %}selected{% endif %}>10</option>
-                        <option value="25" {% if request.args.get('per_page') == '25' %}selected{% endif %}>25</option>
-                        <option value="50" {% if request.args.get('per_page') == '50' %}selected{% endif %}>50</option>
-                    </select>
-                    <span class="text-muted">por página</span>
-                </form>
-            </div>
-        </nav>
-        {% endif %}
-        
-        <!-- Información adicional -->
-        <div class="text-center mt-4">
-            <small class="text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                Mostrando {{ duenos_paginated.per_page * (duenos_paginated.page - 1) + 1 }} 
-                - {{ duenos_paginated.per_page * (duenos_paginated.page - 1) + duenos_paginated.items|length }} 
-                de {{ duenos_paginated.total }} propietarios
-                {% if search %} | Búsqueda: "{{ search }}"{% endif %}
-            </small>
-        </div>
+            </tbody>
+        </table>
     </div>
-</div>
 
-<!-- ===== MODALES FUERA DE LA TABLA ===== -->
-{% set duenos_unicos_modales = {} %}
-{% for asistencia in asistencias %}
-    {% if asistencia.dueno.id not in duenos_unicos_modales %}
-        {% set _ = duenos_unicos_modales.update({asistencia.dueno.id: asistencia.dueno}) %}
-        
-        <!-- Modal de Asistencias -->
-        <div class="modal fade" id="asistencias{{ asistencia.dueno.id }}" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content glass-card">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-calendar-check me-2"></i>
-                            <span class="modal-title-text">Asistencias - {{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno }}</span>
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Descripción</th>
-                                        <th class="d-none d-md-table-cell">Fecha</th>
-                                        <th>Estado</th>
-                                        <th class="d-none d-sm-table-cell">Multa</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for asis in asistencias if asis.dueno.id == asistencia.dueno.id %}
-                                    <tr>
-                                        <td>
-                                            <div class="mobile-description">
-                                                {{ asis.reunion.descripcion }}
-                                                <small class="d-md-none d-block text-muted">
-                                                    {{ asis.reunion.fecha.strftime('%d/%m/%Y') if asis.reunion.fecha else 'No definida' }}
-                                                </small>
-                                            </div>
-                                        </td>
-                                        <td class="d-none d-md-table-cell">
-                                            {{ asis.reunion.fecha.strftime('%d/%m/%Y') if asis.reunion.fecha else 'No definida' }}
-                                        </td>
-                                        <td>
-                                            {% if asis.asistio %}
-                                                <span class="badge bg-success">
-                                                    <i class="fas fa-check me-1 d-none d-sm-inline"></i>
-                                                    <span class="d-none d-sm-inline">Asistió</span>
-                                                    <i class="fas fa-check d-sm-none"></i>
-                                                </span>
-                                            {% else %}
-                                                <span class="badge bg-danger">
-                                                    <i class="fas fa-times me-1 d-none d-sm-inline"></i>
-                                                    <span class="d-none d-sm-inline">No Asistió</span>
-                                                    <i class="fas fa-times d-sm-none"></i>
-                                                </span>
-                                            {% endif %}
-                                            <div class="d-sm-none text-danger mt-1">
-                                                {% if not asis.asistio %}
-                                                    Multa: Bs. {{ asis.reunion.monto_multa if asis.reunion.monto_multa else '0' }}
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="d-none d-sm-table-cell">
-                                            {% if not asis.asistio %}
-                                                <span class="text-danger">Bs. {{ asis.reunion.monto_multa if asis.reunion.monto_multa else '0' }}</span>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="fas fa-times me-1"></i>Cerrar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal de Terrenos -->
-        <div class="modal fade" id="terrenos{{ asistencia.dueno.id }}" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content glass-card">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-map-marked-alt me-2"></i>
-                            <span class="modal-title-text">Terrenos - {{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno }}</span>
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Lote/Lugar</th>
-                                        <th class="d-none d-md-table-cell">Manzano</th>
-                                        <th>Metros²</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for terr in terrenos if terr.dueno.id == asistencia.dueno.id %}
-                                    <tr>
-                                        <td>
-                                            <span class="badge bg-primary">{{ terr.lugar }}</span>
-                                            <div class="d-md-none text-muted mt-1">
-                                                <small>Manzano: {{ terr.manzano }}</small>
-                                            </div>
-                                        </td>
-                                        <td class="d-none d-md-table-cell">{{ terr.manzano }}</td>
-                                        <td>{{ terr.metros_cuadrados }} m²</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="fas fa-times me-1"></i>Cerrar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal de Cuotas -->
-        <div class="modal fade" id="cuotas{{ asistencia.dueno.id }}" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content glass-card">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-money-bill-wave me-2"></i>
-                            <span class="modal-title-text">Cuotas - {{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno }}</span>
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        {% set cuotas_propietario = [] %}
-                        {% for cuota in cuotas %}
-                            {% if cuota.terreno and cuota.terreno.dueno and cuota.terreno.dueno.id == asistencia.dueno.id %}
-                                {% set _ = cuotas_propietario.append(cuota) %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if cuotas_propietario %}
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Concepto</th>
-                                            <th class="d-none d-lg-table-cell">Terreno</th>
-                                            <th>Monto</th>
-                                            <th class="d-none d-md-table-cell">Estado</th>
-                                            <th class="d-none d-xl-table-cell">Fecha</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for cuota in cuotas_propietario %}
-                                        <tr>
-                                            <td>
-                                                <div class="cuota-info">
-                                                    <span class="badge bg-info">{{ cuota.titulo }}</span>
-                                                    {% if cuota.descripcion %}
-                                                        <div class="d-block d-sm-none">
-                                                            <small class="text-muted">{{ cuota.descripcion[:30] }}...</small>
-                                                        </div>
-                                                    {% endif %}
-                                                    <div class="d-lg-none mt-1">
-                                                        <small class="text-muted">Terreno: 
-                                                            <span class="badge bg-primary badge-sm">{{ cuota.terreno.lugar }}</span>
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="d-none d-lg-table-cell">
-                                                <span class="badge bg-primary">{{ cuota.terreno.lugar }}</span>
-                                            </td>
-                                            <td>
-                                                <strong class="text-primary">Bs. {{ cuota.monto }}</strong>
-                                                <div class="d-md-none mt-1">
-                                                    {% if cuota.pagado %}
-                                                        <span class="badge bg-success badge-sm">
-                                                            <i class="fas fa-check"></i> Pagado
-                                                        </span>
-                                                    {% else %}
-                                                        <span class="badge bg-danger badge-sm">
-                                                            <i class="fas fa-times"></i> Pendiente
-                                                        </span>
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                            <td class="d-none d-md-table-cell">
-                                                {% if cuota.pagado %}
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check me-1"></i>Pagado
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-danger">
-                                                        <i class="fas fa-times me-1"></i>Pendiente
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="d-none d-xl-table-cell">
-                                                {% if cuota.fecha_creacion %}
-                                                    <span class="text-muted">{{ cuota.fecha_creacion.strftime('%d/%m/%Y') }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">Sin fecha</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="text-center py-4">
-                                <div class="text-muted">
-                                    <i class="fas fa-info-circle fa-2x mb-2"></i>
-                                    <p>No hay cuotas registradas para este propietario</p>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="modal-footer modal-footer-responsive">
-                        {% set cuotas_pagadas = [] %}
-                        {% set cuotas_pendientes = [] %}
-                        
-                        {% for cuota in cuotas %}
-                            {% if cuota.terreno and cuota.terreno.dueno and cuota.terreno.dueno.id == asistencia.dueno.id %}
-                                {% if cuota.pagado %}
-                                    {% set _ = cuotas_pagadas.append(cuota.monto) %}
-                                {% else %}
-                                    {% set _ = cuotas_pendientes.append(cuota.monto) %}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% set total_pagado = cuotas_pagadas | sum %}
-                        {% set total_pendiente = cuotas_pendientes | sum %}
-                        
-                        <div class="cuotas-summary-responsive">
-                            <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center">
-                                <small class="text-muted me-3 mb-2 mb-sm-0">
-                                    <i class="fas fa-check-circle text-success me-1"></i>
-                                    <strong>Pagado: Bs. {{ total_pagado if total_pagado else '0' }}</strong>
-                                </small>
-                                <small class="text-muted">
-                                    <i class="fas fa-exclamation-circle text-danger me-1"></i>
-                                    <strong>Pendiente: Bs. {{ total_pendiente if total_pendiente else '0' }}</strong>
-                                </small>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-secondary mt-3 mt-sm-0" data-bs-dismiss="modal">
-                            <i class="fas fa-times me-1"></i>Cerrar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    {% if duenos_paginated and duenos_paginated.total > 0 %}
+    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
+        <span class="small text-muted">
+            {{ duenos_paginated.per_page * (duenos_paginated.page - 1) + 1 }}–{{ duenos_paginated.per_page * (duenos_paginated.page - 1) + duenos_paginated.items|length }}
+            de {{ duenos_paginated.total }}{% if search %} · búsqueda: "{{ search }}"{% endif %}
+        </span>
+        {{ pagination(duenos_paginated, 'user.index', search=search) }}
+    </div>
     {% endif %}
-{% endfor %}<style>
-    /* ===== FORZAR MODO OSCURO - ESTILOS PRIORITARIOS ===== */
-    [data-theme="dark"] * {
-        color: inherit;
-    }
-
-    [data-theme="dark"] .table,
-    [data-theme="dark"] .table > :not(caption) > * > *,
-    [data-theme="dark"] .modal-body .table,
-    [data-theme="dark"] .modal-body .table > :not(caption) > * > * {
-        background-color: transparent !important;
-        color: #e9ecef !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
-    }
-
-    [data-theme="dark"] .modal-content,
-    [data-theme="dark"] .modal-body,
-    [data-theme="dark"] .modal-header,
-    [data-theme="dark"] .modal-footer {
-        background-color: rgba(30, 30, 30, 0.95) !important;
-        color: #e9ecef !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
-    }
-
-    [data-theme="dark"] .directory-table,
-    [data-theme="dark"] .directory-table .table-responsive {
-        background-color: rgba(30, 30, 30, 0.95) !important;
-    }
-
-    /* ===== HERO SECTION STYLES ===== */
-    .hero-section {
-        padding: 60px 0;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .hero-title {
-        font-family: 'Poppins', sans-serif;
-        font-size: 3.5rem;
-        font-weight: 800;
-        color: var(--text-primary);
-        margin-bottom: 1rem;
-        line-height: 1.2;
-    }
-
-    .text-gradient {
-        background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    .hero-subtitle {
-        font-size: 1.2rem;
-        color: var(--text-muted);
-        margin-bottom: 2rem;
-        line-height: 1.6;
-    }
-
-    .btn-premium {
-        background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-        border: none;
-        color: white;
-        padding: 12px 30px;
-        border-radius: 50px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-    }
-
-    .btn-premium:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
-        color: white;
-    }
-
-    .btn-outline-premium {
-        border: 2px solid var(--accent-color);
-        color: var(--accent-color);
-        padding: 10px 28px;
-        border-radius: 50px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        background: transparent;
-    }
-
-    .btn-outline-premium:hover {
-        background: var(--accent-color);
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
-    }
-
-    /* ===== STATS CARDS ===== */
-    .stat-card {
-        padding: 25px;
-        text-align: center;
-        height: 100%;
-        transition: all 0.3s ease;
-        border-radius: 20px;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px) scale(1.02);
-    }
-
-    .stat-icon {
-        font-size: 2.5rem;
-        color: var(--accent-color);
-        margin-bottom: 15px;
-    }
-
-    .stat-number {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: var(--text-primary);
-        margin: 0;
-    }
-
-    .stat-label {
-        color: var(--text-muted);
-        font-weight: 500;
-        margin: 0;
-        font-size: 0.9rem;
-    }
-
-    /* ===== QUICK ACCESS CARDS ===== */
-    .section-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--text-primary);
-    }
-
-    .quick-card {
-        display: block;
-        padding: 30px;
-        text-align: center;
-        border-radius: 20px;
-        transition: all 0.3s ease;
-        height: 100%;
-        text-decoration: none !important;
-        color: var(--text-primary);
-    }
-
-    .quick-card:hover {
-        transform: translateY(-5px) scale(1.02);
-        color: var(--text-primary);
-    }
-
-    .quick-icon {
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-        font-size: 2rem;
-        color: white;
-    }
-
-    .quick-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 10px;
-        color: var(--text-primary);
-    }
-
-    .quick-description {
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        margin: 0;
-    }
-
-    /* ===== DIRECTORY TABLE ===== */
-    .search-container .input-group-text {
-        color: var(--text-muted);
-        border-color: var(--border-color);
-    }
-
-    .search-container .form-control {
-        border-color: var(--border-color);
-        color: var(--text-primary);
-        background: var(--card-bg);
-    }
-
-    .search-container .form-control:focus {
-        border-color: var(--accent-color);
-        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
-        background: var(--card-bg);
-        color: var(--text-primary);
-    }
-
-    .directory-table {
-        border-radius: 20px;
-        overflow: hidden;
-    }
-
-    .table-header th {
-        background: var(--accent-color);
-        color: white;
-        font-weight: 600;
-        border: none;
-        padding: 18px;
-    }
-
-    .table-hover tbody tr:hover {
-        background: rgba(var(--accent-color), 0.1);
-    }
-
-    .propietario-name {
-        font-weight: 600;
-        color: var(--text-primary);
-        font-size: 1rem;
-    }
-
-    .propietario-status {
-        margin-top: 5px;
-    }
-
-    .ci-number {
-        font-family: 'Courier New', monospace;
-        font-weight: 600;
-        color: var(--text-primary);
-        background: rgba(var(--accent-color), 0.1);
-        padding: 4px 8px;
-        border-radius: 6px;
-    }
-
-    .action-btn {
-        border-radius: 20px;
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-
-    .multas-info {
-        font-weight: 500;
-    }
-
-    /* ===== MODAL STYLES ===== */
-    .modal-content.glass-card {
-        border: 1px solid var(--border-color);
-        background: var(--card-bg);
-        color: var(--text-primary);
-    }
-
-    .modal-header {
-        border-color: var(--border-color);
-    }
-
-    .modal-footer {
-        border-color: var(--border-color);
-    }
-    
-    .modal-title {
-        color: var(--text-primary) !important;
-    }
-    
-    .modal-title-text {
-        word-break: break-word;
-        color: var(--text-primary) !important;
-    }
-    
-    .modal-body {
-        color: var(--text-primary);
-    }
-    
-    .modal-footer-responsive {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .cuotas-summary-responsive {
-        width: 100%;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-    
-    .mobile-description {
-        line-height: 1.3;
-    }
-    
-    .cuota-info {
-        line-height: 1.4;
-    }
-    
-    .badge-sm {
-        font-size: 0.7rem;
-        padding: 0.2em 0.4em;
-    }
-
-    /* ===== ESTILOS ESPECÍFICOS PARA MODO OSCURO ===== */
-    [data-theme="dark"] .modal-content.glass-card {
-        background: var(--card-bg) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .modal-title,
-    [data-theme="dark"] .modal-title-text {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .modal-body {
-        color: var(--text-primary) !important;
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .modal-body p,
-    [data-theme="dark"] .modal-body h1,
-    [data-theme="dark"] .modal-body h2,
-    [data-theme="dark"] .modal-body h3,
-    [data-theme="dark"] .modal-body h4,
-    [data-theme="dark"] .modal-body h5,
-    [data-theme="dark"] .modal-body h6,
-    [data-theme="dark"] .modal-body span,
-    [data-theme="dark"] .modal-body div {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .modal-body .table,
-    [data-theme="dark"] .table {
-        color: var(--text-primary) !important;
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .modal-body .table td,
-    [data-theme="dark"] .modal-body .table th,
-    [data-theme="dark"] .table td,
-    [data-theme="dark"] .table th {
-        color: var(--text-primary) !important;
-        border-color: var(--border-color) !important;
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .table-hover tbody tr:hover {
-        background: rgba(255, 255, 255, 0.05) !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .directory-table {
-        background: var(--card-bg) !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .directory-table .table {
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .directory-table .table tbody {
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .directory-table .table tbody tr {
-        background: transparent !important;
-    }
-
-    [data-theme="dark"] .directory-table .table tbody tr td {
-        background: transparent !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .propietario-name {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .ci-number {
-        color: var(--text-primary) !important;
-        background: rgba(52, 152, 219, 0.2) !important;
-    }
-
-    [data-theme="dark"] .text-muted,
-    [data-theme="dark"] .modal-body .text-muted {
-        color: var(--text-muted) !important;
-    }
-
-    [data-theme="dark"] .table-responsive {
-        background: transparent !important;
-    }
-
-    /* Forzar estilos para Bootstrap tables en modo oscuro */
-    [data-theme="dark"] .table-hover > tbody > tr:hover > td,
-    [data-theme="dark"] .table-hover > tbody > tr:hover > th {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: var(--text-primary) !important;
-    }
-
-    /* Forzar modal backgrounds */
-    [data-theme="dark"] .modal-content {
-        background-color: var(--card-bg) !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .modal-header,
-    [data-theme="dark"] .modal-footer {
-        background-color: transparent !important;
-        border-color: var(--border-color) !important;
-    }
-
-    /* ===== MODAL Z-INDEX FIX ===== */
-    .modal {
-        z-index: 1055 !important;
-    }
-
-    .modal-backdrop {
-        z-index: 1050 !important;
-    }
-
-    .modal-dialog {
-        z-index: 1056 !important;
-    }
-
-    .modal-content {
-        position: relative;
-        z-index: 1057 !important;
-    }
-
-    /* Asegurar que el backdrop no interfiera con clicks */
-    .modal-backdrop.show {
-        opacity: 0.5;
-        z-index: 1050 !important;
-    }
-
-    /* ===== PAGINATION STYLES ===== */
-    .pagination-controls {
-        margin-top: 30px;
-    }
-
-    .page-info {
-        color: var(--text-primary);
-        font-size: 1.1rem;
-        margin: 0 20px;
-    }
-
-    /* ===== RESPONSIVE DESIGN ===== */
-    
-    /* ===== LARGE TABLETS Y DESKTOP PEQUEÑO (992px - 1199px) ===== */
-    @media (max-width: 1199px) {
-        .hero-title {
-            font-size: 3rem;
-        }
-        
-        .quick-card {
-            padding: 25px;
-        }
-        
-        .stat-card {
-            padding: 20px;
-        }
-    }
-    
-    /* ===== TABLETS (768px - 991px) ===== */
-    @media (max-width: 991px) {
-        .hero-section {
-            padding: 40px 0;
-        }
-        
-        .hero-title {
-            font-size: 2.8rem;
-            text-align: center;
-        }
-
-        .hero-subtitle {
-            font-size: 1.1rem;
-            text-align: center;
-        }
-        
-        .hero-actions {
-            justify-content: center;
-        }
-
-        .stat-card {
-            padding: 18px;
-            margin-bottom: 15px;
-        }
-        
-        .stat-number {
-            font-size: 2rem;
-        }
-
-        .quick-card {
-            padding: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .quick-title {
-            font-size: 1.1rem;
-        }
-
-        .search-container {
-            margin-bottom: 15px;
-        }
-
-        .section-header {
-            flex-direction: column;
-            align-items: flex-start !important;
-        }
-
-        .section-header .search-container {
-            margin-top: 15px;
-            width: 100%;
-        }
-        
-        .section-title {
-            font-size: 1.8rem;
-        }
-    }
-
-    /* ===== MÓVILES GRANDES (576px - 767px) ===== */
-    @media (max-width: 767px) {
-        .hero-section {
-            padding: 30px 0;
-        }
-        
-        .hero-title {
-            font-size: 2.2rem;
-        }
-
-        .hero-subtitle {
-            font-size: 1rem;
-        }
-        
-        .hero-actions .btn {
-            width: 100%;
-            margin-bottom: 15px;
-        }
-        
-        .hero-actions .btn:last-child {
-            margin-bottom: 30px; /* Más espacio después del último botón */
-        }
-
-        .stat-card {
-            padding: 15px;
-            margin-bottom: 10px;
-        }
-        
-        .stat-number {
-            font-size: 1.8rem;
-        }
-        
-        .stat-icon {
-            font-size: 2rem;
-        }
-
-        .quick-card {
-            padding: 20px;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-        
-        .quick-title {
-            font-size: 1rem;
-        }
-        
-        .quick-description {
-            font-size: 0.85rem;
-        }
-
-        /* Tabla responsive mejorada */
-        .table-responsive {
-            border: none;
-        }
-        
-        .directory-table {
-            border-radius: 10px; /* Menos redondeado en móviles */
-        }
-        
-        .table th, .table td {
-            padding: 8px 4px;
-            font-size: 0.85rem;
-        }
-        
-        .propietario-name {
-            font-size: 0.9rem;
-        }
-        
-        .ci-number {
-            font-size: 0.8rem;
-            padding: 2px 6px;
-        }
-        
-        .action-btn {
-            padding: 6px 8px;
-            font-size: 0.75rem;
-        }
-        
-        .action-btn .fas {
-            margin-right: 0;
-        }
-        
-        .action-btn span {
-            display: none;
-        }
-
-        /* Modales responsive */
-        .modal-dialog {
-            margin: 10px;
-            max-width: none;
-        }
-        
-        .modal-content {
-            border-radius: 15px;
-        }
-        
-        .modal-header {
-            padding: 15px;
-        }
-        
-        .modal-body {
-            padding: 15px;
-        }
-        
-        .modal-footer {
-            padding: 15px;
-            flex-direction: column;
-        }
-        
-        .cuotas-summary {
-            width: 100%;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .cuotas-summary small {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .pagination-controls {
-            margin-top: 20px;
-        }
-        
-        .page-info {
-            margin: 0 15px;
-            font-size: 1rem;
-        }
-    }
-
-    /* ===== MÓVILES PEQUEÑOS (hasta 575px) ===== */
-    @media (max-width: 575px) {
-        .container {
-            padding-left: 15px;
-            padding-right: 15px;
-        }
-        
-        .hero-section {
-            padding: 20px 0;
-        }
-        
-        .hero-title {
-            font-size: 1.8rem;
-            line-height: 1.1;
-        }
-
-        .hero-subtitle {
-            font-size: 0.9rem;
-        }
-        
-        .btn-lg {
-            font-size: 0.9rem;
-            padding: 10px 20px;
-        }
-
-        .stat-card {
-            padding: 12px;
-        }
-        
-        .stat-number {
-            font-size: 1.5rem;
-        }
-        
-        .stat-label {
-            font-size: 0.8rem;
-        }
-        
-        .stat-icon {
-            font-size: 1.5rem;
-            margin-bottom: 8px;
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-        }
-
-        .quick-card {
-            padding: 15px;
-        }
-        
-        .quick-icon {
-            width: 50px;
-            height: 50px;
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-        }
-        
-        .quick-title {
-            font-size: 0.9rem;
-        }
-        
-        .quick-description {
-            font-size: 0.8rem;
-        }
-
-        /* Tabla ultra compacta */
-        .table th, .table td {
-            padding: 6px 2px;
-            font-size: 0.8rem;
-        }
-        
-        .table th:nth-child(2), 
-        .table td:nth-child(2) {
-            display: none; /* Ocultar CI en móviles muy pequeños */
-        }
-        
-        .propietario-details {
-            margin-left: 0;
-        }
-        
-        .propietario-name {
-            font-size: 0.8rem;
-            line-height: 1.1;
-        }
-        
-        .action-btn {
-            padding: 4px 6px;
-            font-size: 0.7rem;
-        }
-
-        /* Modales móviles pequeños */
-        .modal-dialog {
-            margin: 5px;
-        }
-        
-        .modal-title {
-            font-size: 1rem;
-        }
-        
-        .modal-body .row .col-md-4,
-        .modal-body .row .col-md-3,
-        .modal-body .row .col-md-2 {
-            margin-bottom: 5px;
-        }
-        
-        .modal-body .row {
-            font-size: 0.8rem;
-        }
-        
-        .badge {
-            font-size: 0.7rem;
-        }
-
-        .pagination-controls .btn {
-            padding: 8px 12px;
-        }
-        
-        .page-info {
-            font-size: 0.9rem;
-            margin: 0 10px;
-        }
-    }
-
-    /* ===== MÓVILES EXTRA PEQUEÑOS (hasta 375px) ===== */
-    @media (max-width: 375px) {
-        .hero-title {
-            font-size: 1.6rem;
-        }
-        
-        .hero-subtitle {
-            font-size: 0.85rem;
-        }
-        
-        .btn-lg {
-            font-size: 0.8rem;
-            padding: 8px 16px;
-        }
-
-        .stat-card {
-            padding: 10px;
-        }
-        
-        .stat-number {
-            font-size: 1.3rem;
-        }
-        
-        .section-title {
-            font-size: 1.3rem;
-        }
-
-        .table th, .table td {
-            padding: 4px 1px;
-            font-size: 0.75rem;
-        }
-        
-        .propietario-name {
-            font-size: 0.75rem;
-        }
-        
-        .action-btn {
-            padding: 3px 4px;
-            font-size: 0.65rem;
-        }
-        
-        .modal-title {
-            font-size: 0.9rem;
-        }
-        
-        .cuotas-summary small {
-            font-size: 0.7rem;
-        }
-    }
-
-    /* ===== MODAL INFORMATIVO DEL SISTEMA ===== */
-    .system-logo {
-        background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
-    }
-
-    .system-logo i {
-        color: white !important;
-    }
-
-    .feature-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 15px;
-        padding: 20px;
-        text-align: center;
-        transition: all 0.3s ease;
-        height: 100%;
-    }
-
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border-color: var(--accent-color);
-    }
-
-    .feature-icon {
-        margin-bottom: 15px;
-    }
-
-    .feature-title {
-        color: var(--text-primary);
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-
-    .feature-description {
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        line-height: 1.5;
-        margin: 0;
-    }
-
-    .benefits-section {
-        background: rgba(var(--accent-color), 0.05);
-        border-radius: 15px;
-        padding: 25px;
-        border: 1px solid rgba(var(--accent-color), 0.1);
-    }
-
-    .benefit-item {
-        padding: 15px;
-    }
-
-    .benefit-item h6 {
-        color: var(--text-primary);
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
-
-    .tech-info {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 15px;
-        padding: 20px;
-    }
-
-    .tech-info h5 {
-        color: var(--text-primary);
-        border-bottom: 2px solid var(--accent-color);
-        padding-bottom: 10px;
-    }
-
-    .tech-info ul li {
-        color: var(--text-primary);
-        margin-bottom: 8px;
-        padding-left: 10px;
-    }
-
-    /* ===== ESTILOS ESPECÍFICOS PARA MODO OSCURO - MODAL INFORMATIVO ===== */
-    [data-theme="dark"] .feature-card {
-        background: var(--card-bg) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .feature-title {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .feature-description {
-        color: var(--text-muted) !important;
-    }
-
-    [data-theme="dark"] .benefit-item h6 {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .benefit-item p {
-        color: var(--text-muted) !important;
-    }
-
-    [data-theme="dark"] .benefits-section {
-        background: rgba(52, 152, 219, 0.1) !important;
-        border-color: rgba(52, 152, 219, 0.2) !important;
-    }
-
-    [data-theme="dark"] .tech-info {
-        background: var(--card-bg) !important;
-        border-color: var(--border-color) !important;
-    }
-
-    [data-theme="dark"] .tech-info h5 {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] .tech-info ul li {
-        color: var(--text-primary) !important;
-    }
-
-    /* Forzar todos los textos del modal informativo */
-    [data-theme="dark"] #aboutSystemModal .modal-body h1,
-    [data-theme="dark"] #aboutSystemModal .modal-body h2,
-    [data-theme="dark"] #aboutSystemModal .modal-body h3,
-    [data-theme="dark"] #aboutSystemModal .modal-body h4,
-    [data-theme="dark"] #aboutSystemModal .modal-body h5,
-    [data-theme="dark"] #aboutSystemModal .modal-body h6,
-    [data-theme="dark"] #aboutSystemModal .modal-body p,
-    [data-theme="dark"] #aboutSystemModal .modal-body span,
-    [data-theme="dark"] #aboutSystemModal .modal-body div,
-    [data-theme="dark"] #aboutSystemModal .modal-body li {
-        color: var(--text-primary) !important;
-    }
-
-    [data-theme="dark"] #aboutSystemModal .text-muted {
-        color: var(--text-muted) !important;
-    }
-
-    /* Responsive para modal informativo */
-    @media (max-width: 768px) {
-        .system-logo {
-            width: 60px;
-            height: 60px;
-        }
-
-        .system-logo i {
-            font-size: 1.5rem;
-        }
-
-        .feature-card {
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .feature-icon i {
-            font-size: 1.5rem;
-        }
-
-        .benefits-section {
-            padding: 15px;
-        }
-
-        .benefit-item {
-            padding: 10px;
-        }
-
-        .benefit-item i {
-            font-size: 1.5rem;
-        }
-
-        .tech-info {
-            padding: 15px;
-        }
-
-        .modal-body {
-            padding: 15px;
-        }
-    }
-</style>
-
+</div>
+
+<!-- Modal Detalle por propietario (asistencias, terrenos, cuotas) -->
+<div class="modal fade" id="detalleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold" id="detalleTitulo"></h5>
+                    <div class="text-muted small" id="detalleNombre"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-0" id="detalleBody"></div>
+            <div class="modal-footer justify-content-between" id="detalleFooter"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Información del sistema -->
+<div class="modal fade" id="aboutSystemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Sistema de Gestión Comunitaria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Plataforma oficial desarrollada para la administración y rendición de cuentas de la Junta de Vecinos Circuata.</p>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="person align-items-start">
+                            <div class="stat-icon tone-brand"><i class="fas fa-users"></i></div>
+                            <div><div class="person-name">Propietarios</div><div class="person-meta small">Registro civil, cédulas e historial general.</div></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="person align-items-start">
+                            <div class="stat-icon tone-success"><i class="fas fa-map-marked-alt"></i></div>
+                            <div><div class="person-name">Terrenos</div><div class="person-meta small">Lotes, manzanas y superficie cuadrada.</div></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="person align-items-start">
+                            <div class="stat-icon tone-warning"><i class="fas fa-calendar-alt"></i></div>
+                            <div><div class="person-name">Reuniones</div><div class="person-meta small">Asambleas, control de asistencia y multas.</div></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="person align-items-start">
+                            <div class="stat-icon tone-info"><i class="fas fa-money-bill-wave"></i></div>
+                            <div><div class="person-name">Cuotas y Aportes</div><div class="person-meta small">Emisión y control de pagos y aportes.</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const rowsPerPage = 10;
-        const tableBody = document.getElementById("propietariosBody");
-        const rows = Array.from(tableBody.getElementsByTagName("tr"));
-        let currentPage = 1;
+    (function () {
+        var modalEl = document.getElementById('detalleModal');
+        var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
-        function displayTablePage(page) {
-            const start = (page - 1) * rowsPerPage;
-            const end = start + rowsPerPage;
-            rows.forEach((row, index) => {
-                row.style.display = (index >= start && index < end) ? "" : "none";
-            });
-            document.getElementById("pageNumber").textContent = page;
-            
-            // Update button states
-            document.getElementById("prevPage").disabled = page === 1;
-            document.getElementById("nextPage").disabled = page === Math.ceil(rows.length / rowsPerPage);
+        function esc(v) {
+            var d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
         }
 
-        document.getElementById("prevPage").addEventListener("click", function () {
-            if (currentPage > 1) {
-                currentPage--;
-                displayTablePage(currentPage);
-            }
-        });
+        document.querySelectorAll('.btn-detalle').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var kind = this.getAttribute('data-kind');
+                var id = this.getAttribute('data-id');
+                var nombre = this.getAttribute('data-nombre');
 
-        document.getElementById("nextPage").addEventListener("click", function () {
-            if (currentPage < Math.ceil(rows.length / rowsPerPage)) {
-                currentPage++;
-                displayTablePage(currentPage);
-            }
-        });
+                var titles = {
+                    'asistencias': 'Historial de asistencias',
+                    'terrenos': 'Terrenos registrados',
+                    'cuotas': 'Estado de cuotas'
+                };
 
-        // Search functionality
-        document.getElementById("searchInput").addEventListener("keyup", function () {
-            const filter = this.value.toUpperCase();
-            const table = document.getElementById("propietariosTable");
-            const rows = table.getElementsByTagName("tr");
+                document.getElementById('detalleTitulo').textContent = titles[kind] || 'Detalle';
+                document.getElementById('detalleNombre').textContent = nombre;
+                var body = document.getElementById('detalleBody');
+                var foot = document.getElementById('detalleFooter');
 
-            for (let i = 1; i < rows.length; i++) {
-                let display = false;
-                const cells = rows[i].getElementsByTagName("td");
-                
-                for (let j = 0; j < cells.length; j++) {
-                    if (cells[j]) {
-                        const txtValue = cells[j].textContent || cells[j].innerText;
-                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                            display = true;
-                            break;
-                        }
+                body.innerHTML = '<div class="p-4 text-center"><div class="spinner-border text-primary spinner-border-sm me-2"></div>Cargando información...</div>';
+                foot.innerHTML = '';
+                if (modal) modal.show();
+
+                try {
+                    var res = await fetch('/api/dueno/' + id + '/' + kind);
+                    var data = await res.json();
+
+                    if (!data.success) {
+                        body.innerHTML = '<div class="alert alert-danger m-3">Error: ' + esc(data.error) + '</div>';
+                        return;
                     }
-                }
-                
-                rows[i].style.display = display ? "" : "none";
-            }
-        });
 
-        // Initialize table
-        displayTablePage(currentPage);
-        
-        // Animate stats on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
+                    if (kind === 'asistencias') {
+                        var rows = (data.asistencias || []).map(function (a) {
+                            var chip = a.presente
+                                ? '<span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Presente</span>'
+                                : '<span class="chip tone-danger"><i class="fas fa-times-circle me-1"></i>Ausente (Bs. ' + (a.multa_monto || 0) + ')</span>';
+                            return '<tr>' +
+                                '<td class="ps-3"><div class="fw-semibold">' + esc(a.reunion.tema) + '</div></td>' +
+                                '<td>' + esc(a.reunion.fecha) + ' ' + esc(a.reunion.hora) + '</td>' +
+                                '<td class="pe-3">' + chip + '</td>' +
+                                '</tr>';
+                        }).join('');
 
-        const observer = new IntersectionObserver(function(entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.animation = 'slideInUp 0.6s ease-out forwards';
+                        body.innerHTML = rows
+                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Reunión</th><th>Fecha</th><th class="pe-3">Asistencia</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                            : '<div class="p-4 text-center text-muted">Sin asistencias registradas.</div>';
+                    } else if (kind === 'terrenos') {
+                        var rows = (data.terrenos || []).map(function (t) {
+                            return '<tr>' +
+                                '<td class="ps-3 fw-semibold">' + esc(t.numero_lote) + '</td>' +
+                                '<td>' + esc(t.ubicacion) + '</td>' +
+                                '<td class="pe-3 num">' + esc(t.superficie) + ' m²</td>' +
+                                '</tr>';
+                        }).join('');
+
+                        body.innerHTML = rows
+                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Lote</th><th>Ubicación</th><th class="pe-3">Superficie</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                            : '<div class="p-4 text-center text-muted">Sin terrenos asociados.</div>';
+                    } else if (kind === 'cuotas') {
+                        var rows = (data.cuotas || []).map(function (c) {
+                            var chip = c.estado === 'pagado'
+                                ? '<span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Pagada</span>'
+                                : '<span class="chip tone-warning"><i class="fas fa-clock me-1"></i>Pendiente</span>';
+                            return '<tr>' +
+                                '<td class="ps-3 fw-semibold">' + esc(c.descripcion) + '</td>' +
+                                '<td class="num">Bs. ' + Number(c.monto).toFixed(2) + '</td>' +
+                                '<td>' + chip + '</td>' +
+                                '<td class="pe-3 text-muted small">' + esc(c.fecha_vencimiento) + '</td>' +
+                                '</tr>';
+                        }).join('');
+
+                        body.innerHTML = rows
+                            ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="ps-3">Concepto</th><th>Monto</th><th>Estado</th><th class="pe-3">Fecha</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                            : '<div class="p-4 text-center text-muted">Sin cuotas registradas.</div>';
+                    }
+                } catch (e) {
+                    body.innerHTML = '<div class="alert alert-danger m-3">Error de conexión: ' + esc(e.message) + '</div>';
                 }
             });
-        }, observerOptions);
-
-        // Observe stat cards
-        document.querySelectorAll('.stat-card').forEach(card => {
-            observer.observe(card);
         });
-
-        // Observe quick cards
-        document.querySelectorAll('.quick-card').forEach(card => {
-            observer.observe(card);
-        });
-
-        // ===== MODAL MANAGEMENT ===== 
-        // Asegurar que los modales se manejen correctamente
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('show.bs.modal', function () {
-                // Asegurar que el modal esté en el z-index correcto
-                this.style.zIndex = '1055';
-                
-                // Encontrar el backdrop y asegurar su z-index
-                setTimeout(() => {
-                    const backdrop = document.querySelector('.modal-backdrop');
-                    if (backdrop) {
-                        backdrop.style.zIndex = '1050';
-                    }
-                }, 10);
-            });
-
-            modal.addEventListener('hidden.bs.modal', function () {
-                // Limpiar cualquier backdrop residual
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(backdrop => {
-                    if (backdrop && !document.querySelector('.modal.show')) {
-                        backdrop.remove();
-                    }
-                });
-            });
-        });
-
-        // Prevenir clicks en backdrop que puedan causar problemas
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal-backdrop')) {
-                const openModal = document.querySelector('.modal.show');
-                if (openModal) {
-                    const bsModal = bootstrap.Modal.getInstance(openModal);
-                    if (bsModal) {
-                        bsModal.hide();
-                    }
-                }
-            }
-        });
-    });
+    })();
 </script>
-
-<!-- Modal Informativo del Sistema -->
-<div class="modal fade" id="aboutSystemModal" tabindex="-1" aria-labelledby="aboutSystemModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h1 class="modal-title fs-4" id="aboutSystemModalLabel">
-                    <i class="fas fa-info-circle me-2 text-primary"></i>
-                    <span class="text-gradient">Sistema de Gestión Comunitaria</span>
-                </h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Hero del Modal -->
-                <div class="text-center mb-4">
-                    <div class="system-logo mb-3">
-                        <i class="fas fa-home fa-3x text-primary"></i>
-                    </div>
-                    <h3 class="text-primary">Junta de Vecinos Circuata</h3>
-                    <p class="text-muted">Plataforma integral para la gestión y administración comunitaria</p>
-                </div>
-
-                <!-- Características Principales -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-6">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon">
-                                <i class="fas fa-users fa-2x text-primary"></i>
-                            </div>
-                            <h5 class="feature-title">Gestión de Propietarios</h5>
-                            <p class="feature-description">Registro completo de propietarios con información de contacto, documentos y historial de participación en la comunidad.</p>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon">
-                                <i class="fas fa-map-marked-alt fa-2x text-success"></i>
-                            </div>
-                            <h5 class="feature-title">Control de Terrenos</h5>
-                            <p class="feature-description">Administración detallada de lotes, manzanas y propiedades con información de metros cuadrados y ubicación exacta.</p>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon">
-                                <i class="fas fa-calendar-alt fa-2x text-warning"></i>
-                            </div>
-                            <h5 class="feature-title">Reuniones Comunitarias</h5>
-                            <p class="feature-description">Programación y seguimiento de reuniones vecinales con control de asistencia y acuerdos tomados.</p>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon">
-                                <i class="fas fa-money-bill-wave fa-2x text-info"></i>
-                            </div>
-                            <h5 class="feature-title">Gestión de Cuotas</h5>
-                            <p class="feature-description">Control completo de cuotas comunitarias, pagos, estados y seguimiento financiero por propietario.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Beneficios -->
-                <div class="benefits-section mb-4">
-                    <h4 class="text-center mb-3">
-                        <i class="fas fa-star me-2 text-warning"></i>
-                        Beneficios para la Comunidad
-                    </h4>
-                    <div class="row">
-                        <div class="col-md-4 text-center mb-3">
-                            <div class="benefit-item">
-                                <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
-                                <h6>Transparencia Total</h6>
-                                <p class="small text-muted">Información clara y accesible sobre finanzas y decisiones comunitarias</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-center mb-3">
-                            <div class="benefit-item">
-                                <i class="fas fa-clock fa-2x text-primary mb-2"></i>
-                                <h6>Eficiencia</h6>
-                                <p class="small text-muted">Automatización de procesos administrativos y reducción de trámites</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-center mb-3">
-                            <div class="benefit-item">
-                                <i class="fas fa-shield-alt fa-2x text-info mb-2"></i>
-                                <h6>Seguridad</h6>
-                                <p class="small text-muted">Datos protegidos con acceso controlado según roles de usuario</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Información Técnica -->
-                <div class="tech-info">
-                    <h5 class="mb-3">
-                        <i class="fas fa-cog me-2"></i>
-                        Características Técnicas
-                    </h5>
-                    <ul class="list-unstyled">
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Sistema web responsivo - Acceso desde cualquier dispositivo</li>
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Interfaz intuitiva y fácil de usar</li>
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Control de acceso por roles (Administrador/Usuario)</li>
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Reportes y estadísticas en tiempo real</li>
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Respaldos automáticos de información</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <div class="text-center">
-                    <p class="mb-2 text-muted">
-                        <small>
-                            <i class="fas fa-heart text-danger me-1"></i>
-                            Desarrollado con dedicación para la comunidad Circuata
-                        </small>
-                    </p>
-                    <button type="button" class="btn btn-premium" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-2"></i>Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ========== MODALES AJAX ========== -->
-<!-- Modal Genérico para Asistencias -->
-<div class="modal fade" id="modalAsistencias" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-calendar-check me-2"></i>
-                    Historial de Asistencias - <span id="nombreDuenoAsistencias"></span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="loadingAsistencias" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando asistencias...</p>
-                </div>
-                
-                <div id="contentAsistencias" style="display: none;">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-calendar-alt me-2"></i>Reunión</th>
-                                    <th><i class="fas fa-clock me-2"></i>Fecha/Hora</th>
-                                    <th><i class="fas fa-user-check me-2"></i>Estado</th>
-                                    <th><i class="fas fa-exclamation-triangle me-2"></i>Multa</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaAsistencias">
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div id="sinAsistencias" class="text-center py-4" style="display: none;">
-                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Sin registros de asistencia</h5>
-                        <p class="text-muted">Este propietario no tiene asistencias registradas</p>
-                    </div>
-                </div>
-                
-                <!-- Total de deuda por multas de asistencia -->
-                <div class="modal-footer bg-light">
-                    <div class="w-100 d-flex justify-content-between align-items-center">
-                        <strong class="text-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Total multas por inasistencia:
-                        </strong>
-                        <strong class="text-danger fs-5" id="totalDeudaAsistencias">
-                            Bs. 0.00
-                        </strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Genérico para Terrenos -->
-<div class="modal fade" id="modalTerrenos" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-map me-2"></i>
-                    Terrenos - <span id="nombreDuenoTerrenos"></span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="loadingTerrenos" class="text-center py-5">
-                    <div class="spinner-border text-success" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando terrenos...</p>
-                </div>
-                
-                <div id="contentTerrenos" style="display: none;">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-hashtag me-2"></i>Lote</th>
-                                    <th><i class="fas fa-ruler me-2"></i>Superficie</th>
-                                    <th><i class="fas fa-map-marker-alt me-2"></i>Manzana</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaTerrenos">
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div id="sinTerrenos" class="text-center py-4" style="display: none;">
-                        <i class="fas fa-map-marked-alt fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Sin terrenos registrados</h5>
-                        <p class="text-muted">Este propietario no tiene terrenos asignados</p>
-                    </div>
-                </div>
-                
-                <!-- Total de deuda (terrenos no generan deuda directa) -->
-                <div class="modal-footer bg-light">
-                    <div class="w-100 text-center">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Los terrenos no generan deuda directa. Ver aportes para deudas pendientes.
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Genérico para Cuotas -->
-<div class="modal fade" id="modalCuotas" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-money-bill-wave me-2"></i>
-                    Aportes - <span id="nombreDuenoCuotas"></span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="loadingCuotas" class="text-center py-5">
-                    <div class="spinner-border text-warning" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando aportes...</p>
-                </div>
-                
-                <div id="contentCuotas" style="display: none;">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-dollar-sign me-2"></i>Monto</th>
-                                    <th><i class="fas fa-check-circle me-2"></i>Estado</th>
-                                    <th><i class="fas fa-info-circle me-2"></i>Descripción</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaCuotas">
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div id="sinCuotas" class="text-center py-4" style="display: none;">
-                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Sin aportes registrados</h5>
-                        <p class="text-muted">Este propietario no tiene aportes asignados</p>
-                    </div>
-                </div>
-                
-                <!-- Total de deuda por aportes pendientes -->
-                <div class="modal-footer bg-light">
-                    <div class="w-100 d-flex justify-content-between align-items-center">
-                        <strong class="text-danger">
-                            <i class="fas fa-dollar-sign me-2"></i>
-                            Total deuda pendiente:
-                        </strong>
-                        <strong class="text-danger fs-5" id="totalDeudaCuotas">
-                            Bs. 0.00
-                        </strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- JavaScript para cargar datos AJAX -->
-<script>
-// Event listeners para los botones
-document.addEventListener('DOMContentLoaded', function() {
-    // Botones de Asistencias
-    document.querySelectorAll('.btn-asistencias').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const duenoId = this.dataset.duenoId;
-            const duenoNombre = this.dataset.duenoNombre;
-            cargarAsistencias(duenoId, duenoNombre);
-        });
-    });
-    
-    // Botones de Terrenos
-    document.querySelectorAll('.btn-terrenos').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const duenoId = this.dataset.duenoId;
-            const duenoNombre = this.dataset.duenoNombre;
-            cargarTerrenos(duenoId, duenoNombre);
-        });
-    });
-    
-    // Botones de Cuotas
-    document.querySelectorAll('.btn-cuotas').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const duenoId = this.dataset.duenoId;
-            const duenoNombre = this.dataset.duenoNombre;
-            cargarCuotas(duenoId, duenoNombre);
-        });
-    });
-});
-
-// Función para cargar asistencias
-function cargarAsistencias(duenoId, nombreDueno) {
-    console.log('Cargando asistencias para:', duenoId, nombreDueno); // Debug
-    
-    // Mostrar modal y loading
-    document.getElementById('nombreDuenoAsistencias').textContent = nombreDueno;
-    document.getElementById('loadingAsistencias').style.display = 'block';
-    document.getElementById('contentAsistencias').style.display = 'none';
-    
-    const modal = new bootstrap.Modal(document.getElementById('modalAsistencias'));
-    modal.show();
-    
-    // Hacer petición AJAX
-    fetch(`/api/dueno/${duenoId}/asistencias`)
-        .then(response => {
-            console.log('Response status:', response.status); // Debug
-            return response.json();
-        })
-        .then(data => {
-            console.log('Data received:', data); // Debug
-            document.getElementById('loadingAsistencias').style.display = 'none';
-            document.getElementById('contentAsistencias').style.display = 'block';
-            
-            if (data.success && data.asistencias.length > 0) {
-                const tbody = document.getElementById('tablaAsistencias');
-                tbody.innerHTML = '';
-                
-                data.asistencias.forEach(asistencia => {
-                    // Formatear el texto de la multa
-                    const multaTexto = asistencia.multa_monto && asistencia.multa_monto > 0 
-                        ? `<span class="text-danger fw-bold">Bs. ${asistencia.multa_monto.toFixed(2)}</span>` 
-                        : '<span class="text-muted">-</span>';
-                    
-                    const row = `
-                        <tr>
-                            <td>${asistencia.reunion.tema}</td>
-                            <td>${asistencia.reunion.fecha} ${asistencia.reunion.hora}</td>
-                            <td>
-                                <span class="badge ${asistencia.presente ? 'bg-success' : 'bg-danger'}">
-                                    <i class="fas ${asistencia.presente ? 'fa-check' : 'fa-times'} me-1"></i>
-                                    ${asistencia.presente ? 'Presente' : 'Ausente'}
-                                </span>
-                            </td>
-                            <td>${multaTexto}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-                
-                document.getElementById('sinAsistencias').style.display = 'none';
-            } else {
-                document.getElementById('sinAsistencias').style.display = 'block';
-            }
-            
-            // Actualizar total de deuda por multas de asistencia
-            const totalDeuda = data.total_deuda || 0;
-            document.getElementById('totalDeudaAsistencias').textContent = `Bs. ${totalDeuda.toFixed(2)}`;
-        })
-        .catch(error => {
-            console.error('Error:', error); // Debug
-            document.getElementById('loadingAsistencias').style.display = 'none';
-            alert('Error al cargar las asistencias: ' + error.message);
-        });
-}
-
-// Función para cargar terrenos
-function cargarTerrenos(duenoId, nombreDueno) {
-    console.log('Cargando terrenos para:', duenoId, nombreDueno); // Debug
-    
-    document.getElementById('nombreDuenoTerrenos').textContent = nombreDueno;
-    document.getElementById('loadingTerrenos').style.display = 'block';
-    document.getElementById('contentTerrenos').style.display = 'none';
-    
-    const modal = new bootstrap.Modal(document.getElementById('modalTerrenos'));
-    modal.show();
-    
-    fetch(`/api/dueno/${duenoId}/terrenos`)
-        .then(response => {
-            console.log('Response status:', response.status); // Debug
-            return response.json();
-        })
-        .then(data => {
-            console.log('Data received:', data); // Debug
-            document.getElementById('loadingTerrenos').style.display = 'none';
-            document.getElementById('contentTerrenos').style.display = 'block';
-            
-            if (data.success && data.terrenos.length > 0) {
-                const tbody = document.getElementById('tablaTerrenos');
-                tbody.innerHTML = '';
-                
-                data.terrenos.forEach(terreno => {
-                    const row = `
-                        <tr>
-                            <td><strong>${terreno.numero_lote}</strong></td>
-                            <td>${terreno.superficie} m²</td>
-                            <td>${terreno.ubicacion || '-'}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-                
-                document.getElementById('sinTerrenos').style.display = 'none';
-            } else {
-                document.getElementById('sinTerrenos').style.display = 'block';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error); // Debug
-            document.getElementById('loadingTerrenos').style.display = 'none';
-            alert('Error al cargar los terrenos: ' + error.message);
-        });
-}
-
-// Función para cargar cuotas
-function cargarCuotas(duenoId, nombreDueno) {
-    console.log('Cargando cuotas para:', duenoId, nombreDueno); // Debug
-    
-    document.getElementById('nombreDuenoCuotas').textContent = nombreDueno;
-    document.getElementById('loadingCuotas').style.display = 'block';
-    document.getElementById('contentCuotas').style.display = 'none';
-    
-    const modal = new bootstrap.Modal(document.getElementById('modalCuotas'));
-    modal.show();
-    
-    fetch(`/api/dueno/${duenoId}/cuotas`)
-        .then(response => {
-            console.log('Response status:', response.status); // Debug
-            return response.json();
-        })
-        .then(data => {
-            console.log('Data received:', data); // Debug
-            document.getElementById('loadingCuotas').style.display = 'none';
-            document.getElementById('contentCuotas').style.display = 'block';
-            
-            if (data.success && data.cuotas.length > 0) {
-                const tbody = document.getElementById('tablaCuotas');
-                tbody.innerHTML = '';
-                
-                data.cuotas.forEach(cuota => {
-                    const estadoBadge = cuota.estado === 'pagado' ? 'bg-success' : 'bg-warning';
-                    const row = `
-                        <tr>
-                            <td><strong>Bs. ${cuota.monto.toFixed(2)}</strong></td>
-                            <td>
-                                <span class="badge ${estadoBadge}">
-                                    ${cuota.estado.charAt(0).toUpperCase() + cuota.estado.slice(1)}
-                                </span>
-                            </td>
-                            <td>${cuota.descripcion || '-'}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-                
-                document.getElementById('sinCuotas').style.display = 'none';
-            } else {
-                document.getElementById('sinCuotas').style.display = 'block';
-            }
-            
-            // Actualizar total de deuda por cuotas/aportes pendientes
-            const totalDeuda = data.total_deuda || 0;
-            document.getElementById('totalDeudaCuotas').textContent = `Bs. ${totalDeuda.toFixed(2)}`;
-        })
-        .catch(error => {
-            console.error('Error:', error); // Debug
-            document.getElementById('loadingCuotas').style.display = 'none';
-            alert('Error al cargar los aportes: ' + error.message);
-        });
-}
-</script>
-
 {% endblock %}

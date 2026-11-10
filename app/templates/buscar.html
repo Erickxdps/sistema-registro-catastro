@@ -1,16 +1,6 @@
-<!-- Campo de búsqueda -->
-<div class="field has-addons">
-    <div class="d-flex gap-2 m-3">
-        <div class="control">
-            <input class="input" type="text" placeholder="Buscar..." id="searchInput">
-        </div>
-        <div class="control">
-            <button class="btn btn-info" onclick="searchTable('asistenciasTable')">
-                <span class="icon">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                </span>
-            </button>
-        </div>
-
-    </div>
+<!-- Campo de búsqueda en cliente; requiere searchTable() en static/js/scripts.js -->
+<div class="input-group my-3" style="max-width: 380px;">
+    <span class="input-group-text"><i class="fas fa-search"></i></span>
+    <input class="form-control" type="text" placeholder="Buscar…" id="searchInput">
+    <button class="btn btn-primary" type="button" onclick="searchTable('asistenciasTable')">Buscar</button>
 </div>

@@ -1,300 +1,157 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Nueva cuota · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title mb-0">
-                        <i class="fas fa-plus-circle"></i> Crear Nueva Cuota
-                    </h3>
-                </div>
-                <div class="card-body p-4">
-                    <form method="post">
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label for="titulo" class="form-label">
-                                    <i class="fas fa-tag"></i> Título de la Cuota:
-                                </label>
-                                <input type="text" id="titulo" name="titulo" required class="form-control"
-                                       placeholder="Ej: Cuota mensual Agosto 2025, Mantenimiento de áreas comunes, etc.">
-                                <small class="form-text text-muted">
-                                    Ingrese un título descriptivo para identificar esta cuota
-                                </small>
-                            </div>
-                        </div>
+<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
+    {% call page_header('Nueva cuota', 'Se aplica a todos los terrenos registrados', 'fa-money-bill') %}{% endcall %}
 
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label for="descripcion" class="form-label">
-                                    <i class="fas fa-file-alt"></i> Descripción (Opcional):
-                                </label>
-                                <textarea id="descripcion" name="descripcion" class="form-control" rows="3"
-                                          placeholder="Detalles adicionales sobre la cuota, conceptos incluidos, fechas de vencimiento, etc."></textarea>
-                                <small class="form-text text-muted">
-                                    Información adicional sobre qué incluye esta cuota
-                                </small>
-                            </div>
-                        </div>
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
 
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label for="monto" class="form-label">
-                                    <i class="fas fa-dollar-sign"></i> Monto de la Cuota:
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text">Bs.</span>
-                                    <input type="number" id="monto" name="monto" 
-                                           step="0.01" min="0" required class="form-control"
-                                           placeholder="0.00">
-                                </div>
-                                <small class="form-text text-muted">
-                                    Ingrese el monto en bolivianos (Bs.) que se aplicará a todos los terrenos
-                                </small>
-                            </div>
-                        </div>
+        <form method="post" id="cuotaForm">
+            <div class="mb-3">
+                <md-outlined-text-field
+                    label="Título de la cuota"
+                    id="titulo"
+                    name="titulo"
+                    placeholder="Cuota mensual agosto, Mantenimiento de áreas comunes…"
+                    supporting-text="Identifica el tipo de cuota; las cuotas con el mismo título se agrupan"
+                    required
+                    autofocus>
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">title</md-icon>
+                </md-outlined-text-field>
+            </div>
 
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i>
-                                    <strong>¡Atención!</strong> Esta cuota se aplicará automáticamente a <strong>todos los terrenos registrados</strong>. 
-                                    Se generarán multas automáticamente para aquellos que no paguen en tiempo.
-                                    <br><br>
-                                    <div class="mt-2">
-                                        <strong>Total de terrenos que recibirán la cuota:</strong> 
-                                        <span class="badge badge-primary fs-6">{{ terrenos|length }} terrenos</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <div class="mb-3">
+                <md-outlined-text-field
+                    label="Descripción detallada (opcional)"
+                    id="descripcion"
+                    name="descripcion"
+                    type="textarea"
+                    rows="3"
+                    placeholder="Conceptos incluidos, fecha de vencimiento…">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">notes</md-icon>
+                </md-outlined-text-field>
+            </div>
 
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i>
-                                    <strong>Información:</strong> Al crear esta cuota, se generará automáticamente una multa 
-                                    asociada hasta que sea pagada. Una vez pagada la cuota, la multa será eliminada.
-                                </div>
-                            </div>
-                        </div>
+            <div class="mb-4">
+                <md-outlined-text-field
+                    label="Monto por terreno (Bs.)"
+                    id="monto"
+                    name="monto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    required>
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
+                </md-outlined-text-field>
+            </div>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                                <i class="fas fa-save"></i> Crear Cuota
-                            </button>
-                            <a href="{{ url_for('cuota.list_cuotas') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Volver a Lista
-                            </a>
-                        </div>
-                    </form>
-
-                    <!-- Barra de progreso (inicialmente oculta) -->
-                    <div id="progressContainer" style="display: none;" class="mt-4">
-                        <div class="card border-primary">
-                            <div class="card-body">
-                                <h5 class="card-title text-primary">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>
-                                    Creando cuota...
-                                </h5>
-                                <p class="card-text mb-2">
-                                    Se está aplicando la cuota a todos los terrenos ({{ terrenos|length }} terrenos). Este proceso puede tomar varios minutos.
-                                </p>
-                                <div class="progress mb-3" style="height: 30px;">
-                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
-                                         role="progressbar" style="width: 0%">
-                                        <span id="progressText">Iniciando...</span>
-                                    </div>
-                                </div>
-                                <small class="text-muted" id="progressDetails">
-                                    Preparando datos...
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resultado (inicialmente oculto) -->
-                    <div id="resultContainer" style="display: none;" class="mt-4">
-                        <div id="resultAlert" class="alert" role="alert">
-                            <span id="resultMessage"></span>
-                        </div>
-                    </div>
+            <div class="notice warn mb-2">
+                <span class="material-symbols-outlined" style="color: rgb(var(--t-warning));">warning</span>
+                <div>
+                    Se creará una cuota para <strong>{{ terrenos|length }} terreno{{ 's' if terrenos|length != 1 }}</strong>.
+                    Esta acción generará registros individuales vinculados a cada propiedad.
                 </div>
             </div>
+            <div class="notice mb-4">
+                <span class="material-symbols-outlined" style="color: rgb(var(--t-info));">info</span>
+                <div>Cada cuota genera una multa asociada hasta que se pague; al marcarla como pagada, la multa se cancela automáticamente.</div>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('cuota.list_cuotas') }}" class="text-decoration-none">
+                    <md-text-button type="button">Volver a la lista</md-text-button>
+                </a>
+                <md-filled-button type="submit" id="submitBtn">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Crear cuota
+                </md-filled-button>
+            </div>
+        </form>
+
+        <div id="progressContainer" class="mt-4" style="display:none;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="spinner-border spinner-border-sm text-primary"></span>
+                <strong>Creando cuotas en segundo plano…</strong>
+            </div>
+            <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>
+            <div class="text-muted small mt-2">Aplicando la cuota a {{ terrenos|length }} terrenos. Por favor espera sin cerrar esta página.</div>
+        </div>
+
+        <div id="resultContainer" class="mt-4" style="display:none;">
+            <div id="resultAlert" class="alert" role="alert"><i id="resultIcon"></i><div id="resultMessage"></div></div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    // Manejar envío del formulario con AJAX
-    document.querySelector('form').addEventListener('submit', async function(e) {
+    document.getElementById('cuotaForm').addEventListener('submit', async function (e) {
         e.preventDefault();
-        
-        // Obtener datos del formulario
-        const formData = new FormData(this);
-        const data = {
-            titulo: formData.get('titulo'),
-            descripcion: formData.get('descripcion') || '',
-            monto: parseFloat(formData.get('monto'))
+
+        var tituloField = document.getElementById('titulo');
+        var descField = document.getElementById('descripcion');
+        var montoField = document.getElementById('monto');
+
+        var data = {
+            titulo: (tituloField.value || '').trim(),
+            descripcion: (descField.value || '').trim(),
+            monto: parseFloat(montoField.value)
         };
-        
-        // Validación básica
-        if (!data.titulo || !data.monto || data.monto <= 0) {
-            alert('Por favor complete todos los campos requeridos correctamente.');
+
+        if (!data.titulo || !(data.monto > 0)) {
+            alert('Por favor completa el título y un monto válido mayor a cero.');
             return;
         }
-        
-        // Mostrar barra de progreso
-        document.getElementById('progressContainer').style.display = 'block';
-        document.getElementById('resultContainer').style.display = 'none';
-        
-        // Deshabilitar formulario
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
-        
-        // Simular progreso mientras se procesa
-        let progress = 0;
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-        const progressDetails = document.getElementById('progressDetails');
-        
-        // Actualizar progreso gradualmente
-        progressText.textContent = 'Creando cuota...';
-        progressDetails.textContent = 'Iniciando proceso de creación...';
-        
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 12;
-            if (progress > 90) progress = 90;
-            
-            progressBar.style.width = progress + '%';
-            progressText.textContent = `${Math.round(progress)}%`;
-            
-            if (progress < 25) {
-                progressDetails.textContent = 'Aplicando cuota a terrenos...';
-            } else if (progress < 60) {
-                progressDetails.textContent = 'Generando registros de pagos...';
-            } else if (progress < 85) {
-                progressDetails.textContent = 'Creando multas asociadas...';
-            } else {
-                progressDetails.textContent = 'Finalizando proceso...';
-            }
-        }, 600);
-        
+
+        var btn = document.getElementById('submitBtn');
+        var progress = document.getElementById('progressContainer');
+        var result = document.getElementById('resultContainer');
+        var alertBox = document.getElementById('resultAlert');
+        var icon = document.getElementById('resultIcon');
+        var msg = document.getElementById('resultMessage');
+
+        btn.disabled = true;
+        progress.style.display = 'block';
+        result.style.display = 'none';
+
+        function show(ok, html) {
+            progress.style.display = 'none';
+            result.style.display = 'block';
+            alertBox.className = 'alert alert-' + (ok ? 'success' : 'danger');
+            icon.className = 'fas fa-' + (ok ? 'check-circle' : 'exclamation-circle');
+            msg.innerHTML = html;
+        }
+        function esc(v) {
+            var d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
+        }
+
         try {
-            // Enviar petición AJAX
-            const response = await fetch('/api/cuotas/create', {
+            var response = await fetch('/api/cuotas/create', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            
-            const result = await response.json();
-            
-            // Completar barra de progreso
-            clearInterval(progressInterval);
-            progressBar.style.width = '100%';
-            progressText.textContent = '100%';
-            progressDetails.textContent = 'Proceso completado!';
-            
-            // Mostrar resultado
-            setTimeout(() => {
-                document.getElementById('progressContainer').style.display = 'none';
-                const resultContainer = document.getElementById('resultContainer');
-                const resultAlert = document.getElementById('resultAlert');
-                const resultMessage = document.getElementById('resultMessage');
-                
-                resultContainer.style.display = 'block';
-                
-                if (result.success) {
-                    resultAlert.className = 'alert alert-success';
-                    resultMessage.innerHTML = `
-                        <i class="fas fa-check-circle me-2"></i>
-                        <strong>¡Éxito!</strong> ${result.message}
-                        <br><small>Se crearon ${result.total_cuotas} cuotas individuales</small>
-                    `;
-                    
-                    // Redirigir después de 3 segundos
-                    setTimeout(() => {
-                        window.location.href = '/cuotas';
-                    }, 3000);
-                } else {
-                    resultAlert.className = 'alert alert-danger';
-                    resultMessage.innerHTML = `
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Error:</strong> ${result.error}
-                    `;
-                }
-            }, 1000);
-            
-        } catch (error) {
-            clearInterval(progressInterval);
-            console.error('Error:', error);
-            
-            document.getElementById('progressContainer').style.display = 'none';
-            const resultContainer = document.getElementById('resultContainer');
-            const resultAlert = document.getElementById('resultAlert');
-            const resultMessage = document.getElementById('resultMessage');
-            
-            resultContainer.style.display = 'block';
-            resultAlert.className = 'alert alert-danger';
-            resultMessage.innerHTML = `
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Error de conexión:</strong> ${error.message}
-            `;
-        } finally {
-            // Rehabilitar formulario
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Crear Cuota';
+            var res = await response.json();
+
+            if (res.success) {
+                show(true, '<strong>' + esc(res.message) + '</strong><br><small>Se crearon ' + esc(res.total_cuotas) + ' cuotas individuales. Redirigiendo…</small>');
+                setTimeout(function () { window.location.href = "{{ url_for('cuota.list_cuotas') }}"; }, 2000);
+                return;
+            }
+            show(false, '<strong>Error:</strong> ' + esc(res.error));
+        } catch (err) {
+            show(false, '<strong>Error de conexión:</strong> ' + esc(err.message));
         }
+
+        btn.disabled = false;
     });
 </script>
-
-<style>
-.progress-bar {
-    transition: width 0.6s ease;
-}
-
-#progressContainer {
-    animation: fadeIn 0.5s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.alert {
-    animation: slideIn 0.5s ease;
-}
-
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.form-control:focus, .btn:focus {
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-.card {
-    transition: box-shadow 0.3s ease;
-}
-
-.card:hover {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.form-select:focus, .form-control:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-}
-
-.alert-info {
-    border-left: 4px solid #0dcaf0;
-}
-</style>
 {% endblock %}

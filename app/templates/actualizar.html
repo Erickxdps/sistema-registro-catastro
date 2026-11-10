@@ -1,33 +1,59 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Actualizar usuario · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<h2 class="subtitle is-2">Actualizar Usuario</h2>
+<div class="form-shell" style="max-width: 520px; margin: 0 auto;">
+    {% call page_header('Actualizar usuario', 'Edita los datos y credenciales de la cuenta', 'fa-user-edit') %}{% endcall %}
 
-<form method="post" action="/users/{{ user.id }}/update">
-    <div class="field">
-        <label for="name">Nombre:</label>
-        <div class="control">
-            <input type="text" id="name" name="name" 
-            required class="input" value="{{ user.name }}">
-        </div>
-    </div>
-    
-    <div class="field">
-        <label for="username">Nombre de Usuario:</label>
-        <div class="control">
-            <input type="text" id="username" name="username" 
-            required class="input" value="{{ user.username }}">
-        </div>
-    </div>
-    
-    <div class="field">
-        <label for="role">Rol:</label>
-        <div class="control">
-            <div>
-                <input type="text" id="role" name="role" 
-                required class="input" value="{{ user.role }}">
-        </div>
-    </div>
-    <input type="submit" value="Actualizar" class="button is-primary">
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
 
+        <form method="post" action="/users/{{ user.id }}/update" id="updateUserForm">
+            <div class="mb-3">
+                <md-outlined-text-field
+                    label="Nombre de usuario"
+                    id="username"
+                    name="username"
+                    value="{{ user.username }}"
+                    disabled>
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">person</md-icon>
+                </md-outlined-text-field>
+            </div>
+
+            <div class="mb-3">
+                <md-outlined-text-field
+                    label="Nueva contraseña (dejar en blanco para mantener)"
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="new-password">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">lock_reset</md-icon>
+                </md-outlined-text-field>
+            </div>
+
+            <div class="mb-4">
+                <label for="role" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">admin_panel_settings</span>
+                    Rol de usuario
+                </label>
+                <select id="role" name="role" required class="form-select">
+                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrador (admin)</option>
+                    <option value="doctor" {% if user.role == 'doctor' %}selected{% endif %}>Usuario regular (doctor / operador)</option>
+                </select>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('user.list_users') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Actualizar usuario
+                </md-filled-button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

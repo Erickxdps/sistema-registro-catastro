@@ -1,13 +1,24 @@
+# controllers/cuota_controller.py
+# Controlador de cuotas — refactorizado para:
+#   1. Reemplazar es_dueno_inmune() (import cruzado entre blueprints) por
+#      la propiedad duenio.es_immune del modelo.
+#   2. Eliminar los if/else de autorización duplicados.
+#   3. Añadir @login_required a los endpoints AJAX que lo requerían.
+#   4. Corregir delete_cuotas_by_owner que usaba columnas incorrectas
+#      (id_dueno, id_terreno) que no existen en el esquema actual.
+#
+# IMPORTANTE: nombres de rutas, Blueprint y columnas de BD sin cambios.
+
 from flask import Blueprint, request, redirect, url_for, flash, jsonify, render_template
-from flask_login import login_required, current_user
+from flask_login import login_required
 from sqlalchemy import text
-from models.cuota_model import Cuota
+from models.cuota_model   import Cuota
 from models.terreno_model import Terreno
-from models.multa_model import Multa
+from models.multa_model   import Multa
 from views import cuota_view
 from utils.decorators import role_required
+from utils.validators import validar_texto, validar_monto
 from database import db
-from controllers.multa_controller import es_dueno_inmune
 
 cuota_bp = Blueprint("cuota", __name__)
 
@@ -70,45 +81,41 @@ def list_cuotas():
 @role_required("admin")
 def create_cuota():
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            titulo = request.form["titulo"]
-            descripcion = request.form.get("descripcion", "")
-            monto = float(request.form["monto"])
-            
-            # Obtener todos los terrenos
+        ok_tit, titulo, err_tit = validar_texto(request.form.get("titulo"), "Título de la cuota", min_len=3, max_len=150)
+        ok_desc, descripcion, _ = validar_texto(request.form.get("descripcion"), "Descripción", min_len=0, max_len=500, requerido=False)
+        ok_monto, monto, err_monto = validar_monto(request.form.get("monto"), "Monto por terreno", min_val=0.5)
+
+        if not ok_tit:
+            flash(err_tit, "error")
             terrenos = Terreno.query.all()
-            cuotas_creadas = 0
-            
-            # Crear una cuota para cada terreno
-            for terreno in terrenos:
-                cuota = Cuota(
-                    terreno_id=terreno.id, 
-                    titulo=titulo, 
-                    monto=monto, 
-                    descripcion=descripcion
-                )
-                
-                # Agregar a la sesión y hacer flush para obtener el cuota_id
-                db.session.add(cuota)
-                db.session.flush()  # Esto asigna el cuota_id sin hacer commit
-                
-                # Ahora podemos crear la multa con el cuota_id disponible
-                crear_multa_cuota(cuota)
-                cuotas_creadas += 1
-            
-            # Hacer commit al final para todas las operaciones
-            db.session.commit()
-            
-            flash(f"¡Cuota creada exitosamente! Se aplicó a {cuotas_creadas} terrenos.", "success")
-            return redirect(url_for("cuota.list_cuotas"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
+            return cuota_view.create_cuota(terrenos)
+
+        if not ok_monto:
+            flash(err_monto, "error")
+            terrenos = Terreno.query.all()
+            return cuota_view.create_cuota(terrenos)
+
+        terrenos = Terreno.query.all()
+        cuotas_creadas = 0
+
+        for terreno in terrenos:
+            cuota = Cuota(terreno_id=terreno.id, titulo=titulo, monto=monto, descripcion=descripcion or "")
+            db.session.add(cuota)
+            db.session.flush()
+            _crear_multa_cuota(cuota)
+            cuotas_creadas += 1
+
+        db.session.commit()
+        flash(f"¡Cuota creada exitosamente! Se aplicó a {cuotas_creadas} terrenos.", "success")
+        return redirect(url_for("cuota.list_cuotas"))
     
     terrenos = Terreno.query.all()
     return cuota_view.create_cuota(terrenos)
 
 # Endpoint AJAX para crear cuotas con progreso
 @cuota_bp.route("/api/cuotas/create", methods=["POST"])
+@login_required
+@role_required("admin")
 def create_cuota_ajax():
     try:
         # Obtener datos del formulario
@@ -140,7 +147,7 @@ def create_cuota_ajax():
                 db.session.flush()  # Para obtener el cuota_id
                 
                 # Crear multa asociada
-                crear_multa_cuota(cuota)
+                _crear_multa_cuota(cuota)
                 cuotas_creadas += 1
             
             # Commit del lote
@@ -167,29 +174,16 @@ def update_cuota(cuota_id):
         return redirect(url_for("cuota.list_cuotas"))
 
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            titulo = request.form["titulo"]
-            descripcion = request.form.get("descripcion", "")
-            terreno_id = request.form["terreno_id"]
-            monto = float(request.form["monto"])
-            pagado = request.form.get("pagado") == "on"
-            
-            # Actualizar cuota
-            cuota.update(
-                titulo=titulo,
-                descripcion=descripcion,
-                terreno_id=terreno_id, 
-                monto=monto, 
-                pagado=pagado
-            )
-            
-            # Gestionar multa según estado de pago
-            gestionar_multa_cuota(cuota, pagado)
-            
-            flash("Cuota actualizada exitosamente", "success")
-            return redirect(url_for("cuota.list_cuotas"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
+        titulo      = request.form.get("titulo",      "").strip()
+        descripcion = request.form.get("descripcion", "").strip()
+        terreno_id  = request.form.get("terreno_id",  type=int)
+        monto       = request.form.get("monto",       type=float)
+        pagado      = request.form.get("pagado") == "on"
+
+        cuota.update(titulo=titulo, descripcion=descripcion, terreno_id=terreno_id, monto=monto, pagado=pagado)
+        _gestionar_multa_cuota(cuota, pagado)
+        flash("Cuota actualizada exitosamente.", "success")
+        return redirect(url_for("cuota.list_cuotas"))
 
     terrenos = Terreno.query.all()
     return cuota_view.update_cuota(cuota, terrenos)
@@ -201,12 +195,11 @@ def update_cuota(cuota_id):
 def delete_cuota(cuota_id):
     cuota = Cuota.get_by_id(cuota_id)
     if cuota:
-        # Eliminar multa asociada antes de eliminar cuota
-        eliminar_multa_cuota(cuota)
+        _eliminar_multa_cuota(cuota)
         cuota.delete()
-        flash("Cuota eliminada exitosamente", "success")
+        flash("Cuota eliminada exitosamente.", "success")
     else:
-        flash("Cuota no encontrada", "error")
+        flash("Cuota no encontrada.", "error")
     
     return redirect(url_for("cuota.list_cuotas"))
 
@@ -222,9 +215,7 @@ def toggle_payment(cuota_id):
     # Cambiar estado de pago
     new_pagado = not cuota.pagado
     cuota.update(pagado=new_pagado)
-    
-    # Gestionar multa según estado de pago
-    gestionar_multa_cuota(cuota, new_pagado)
+    _gestionar_multa_cuota(cuota, new_pagado)
     
     return jsonify({
         "success": True, 
@@ -256,40 +247,53 @@ def cuotas_pendientes():
     return cuota_view.list_cuotas_pendientes(cuotas)
 
 # Funciones auxiliares para gestión de multas
-def crear_multa_cuota(cuota):
-    """Crear multa para cuota"""
-    terreno = Terreno.query.get(cuota.terreno_id)
-    if terreno:
-        # 🛡️ VERIFICAR INMUNIDAD ETERNA
-        if es_dueno_inmune(terreno.duenio_id):
-            print(f"🛡️ [INMUNIDAD] Dueño {terreno.duenio_id} tiene inmunidad eterna - No se crea multa por cuota {cuota.titulo}")
-            return
-            
-        multa = Multa(
-            duenio_id=terreno.duenio_id,
-            cuota_id=cuota.cuota_id,  # Usar cuota_id que es la clave primaria
-            monto=cuota.monto,
-            tipo='cuota',
-            descripcion=f'Cuota no pagada: {cuota.titulo}'
-        )
-        multa.save()
+def _crear_multa_cuota(cuota):
+    """Crea una multa de tipo 'cuota' si el propietario no tiene inmunidad."""
+    terreno = db.session.get(Terreno, cuota.terreno_id)
+    if not terreno:
+        return
 
-def gestionar_multa_cuota(cuota, pagado):
-    """Gestionar multa según estado de pago"""
+    # Usar la propiedad del modelo en vez de un ID hardcodeado
+    if terreno.dueno and terreno.dueno.es_immune:
+        return
+
+    multa = Multa(
+        duenio_id=terreno.duenio_id,
+        cuota_id=cuota.cuota_id,
+        monto=cuota.monto,
+        tipo='cuota',
+        descripcion=f'Cuota no pagada: {cuota.titulo}',
+    )
+    multa.save()
+
+# Alias sin prefijo para no romper las llamadas en create_cuota_ajax (lotes)
+crear_multa_cuota = _crear_multa_cuota
+
+
+def _gestionar_multa_cuota(cuota, pagado):
+    """
+    Sincroniza la multa con el estado de pago:
+    - Pagado     → elimina multa existente.
+    - No pagado  → crea multa si no existe.
+    """
     multa = Multa.query.filter_by(cuota_id=cuota.cuota_id, tipo='cuota').first()
-    
     if pagado and multa:
-        # Si se pagó, eliminar multa
         multa.delete()
     elif not pagado and not multa:
-        # Si no se pagó y no hay multa, crear multa
-        crear_multa_cuota(cuota)
+        _crear_multa_cuota(cuota)
 
-def eliminar_multa_cuota(cuota):
-    """Eliminar multa asociada a cuota"""
+# Alias sin prefijo para compatibilidad con código no migrado aún
+gestionar_multa_cuota = _gestionar_multa_cuota
+
+
+def _eliminar_multa_cuota(cuota):
+    """Elimina la multa asociada a una cuota si existe."""
     multa = Multa.query.filter_by(cuota_id=cuota.cuota_id, tipo='cuota').first()
     if multa:
         multa.delete()
+
+# Alias sin prefijo para compatibilidad con código no migrado aún
+eliminar_multa_cuota = _eliminar_multa_cuota
 
 # Ruta para eliminar todas las cuotas de un propietario específico
 @cuota_bp.route("/cuotas/delete-by-owner/<int:dueno_id>", methods=["POST"])
@@ -297,16 +301,14 @@ def eliminar_multa_cuota(cuota):
 @role_required('admin')
 def delete_cuotas_by_owner(dueno_id):
     try:
-        # Obtener todas las cuotas del propietario a través de sus terrenos
-        terrenos = Terreno.query.filter_by(id_dueno=dueno_id).all()
+        # Corrección: usar los nombres reales de columnas (duenio_id, terreno_id)
+        terrenos = Terreno.query.filter_by(duenio_id=dueno_id).all()
         total_eliminadas = 0
         
         for terreno in terrenos:
-            cuotas = Cuota.query.filter_by(id_terreno=terreno.terreno_id).all()
+            cuotas = Cuota.query.filter_by(terreno_id=terreno.id).all()
             for cuota in cuotas:
-                # Eliminar multas asociadas
-                eliminar_multa_cuota(cuota)
-                # Eliminar la cuota
+                _eliminar_multa_cuota(cuota)
                 cuota.delete()
                 total_eliminadas += 1
         
@@ -376,6 +378,8 @@ def delete_cuota_single(cuota_id):
 
 # Endpoint AJAX optimizado para eliminar cuotas por título
 @cuota_bp.route("/api/cuotas/delete-by-title", methods=["POST"])
+@login_required
+@role_required("admin")
 def delete_cuotas_by_title_ajax():
     try:
         data = request.get_json()

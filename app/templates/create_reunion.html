@@ -1,294 +1,157 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Programar reunión · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-warning text-dark">
-                    <h3 class="card-title mb-0">
-                        <i class="fas fa-calendar-plus"></i> Registrar/Programar Reunión
-                    </h3>
+<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
+    {% call page_header('Programar reunión', 'Puede ser una asamblea futura o una reunión a registrar', 'fa-calendar-plus') %}{% endcall %}
+
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
+
+        <form method="post" id="reunionForm">
+            <div class="mb-3">
+                <md-outlined-text-field
+                    label="Descripción / Tema de la reunión"
+                    id="descripcion"
+                    name="descripcion"
+                    placeholder="Reunión mensual de propietarios, asamblea general…"
+                    required
+                    autofocus>
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">event_note</md-icon>
+                </md-outlined-text-field>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <md-outlined-text-field
+                        label="Fecha"
+                        id="fecha"
+                        name="fecha"
+                        type="date"
+                        required>
+                        <md-icon slot="leading-icon" class="material-symbols-outlined">calendar_today</md-icon>
+                    </md-outlined-text-field>
                 </div>
-                <div class="card-body p-4">
-                    <form method="post" id="reunionForm">
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <label for="descripcion" class="form-label">
-                                    <i class="fas fa-file-alt"></i> Descripción:
-                                </label>
-                                <input type="text" id="descripcion" name="descripcion" required class="form-control"
-                                       placeholder="Ej: Reunión mensual de propietarios, Asamblea general, etc.">
-                                <small class="form-text text-muted">
-                                    Breve descripción del propósito de la reunión (pasada o futura)
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3" id="descripcionInput" style="display: none;">
-                            <div class="col-md-12">
-                                <label for="descripcion_editable" class="form-label">
-                                    <i class="fas fa-edit"></i> Editar Descripción:
-                                </label>
-                                <input type="text" id="descripcion_editable" name="descripcion_editable" class="form-control">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="fecha" class="form-label">
-                                    <i class="fas fa-calendar"></i> Fecha:
-                                </label>
-                                <input type="date" id="fecha" name="fecha" required class="form-control">
-                                <small class="form-text text-muted">
-                                    Fecha de la reunión (puede ser pasada o futura)
-                                </small>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="hora" class="form-label">
-                                    <i class="fas fa-clock"></i> Hora:
-                                </label>
-                                <input type="time" id="hora" name="hora" required class="form-control">
-                                <small class="form-text text-muted">
-                                    Hora de inicio de la reunión
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <label for="monto_multa" class="form-label">
-                                    <i class="fas fa-exclamation-triangle"></i> Monto de Multa por Inasistencia:
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text">Bs.</span>
-                                    <input type="number" id="monto_multa" name="monto_multa" 
-                                           value="100.0" step="0.01" min="0" class="form-control"
-                                           placeholder="100.00">
-                                </div>
-                                <small class="form-text text-muted">
-                                    Este monto se aplicará automáticamente a quienes no asistan a la reunión
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ url_for('reunion.list_reuniones') }}" class="btn btn-outline-secondary me-md-2">
-                                <i class="fas fa-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-warning">
-                                <i class="fas fa-save"></i> Programar Reunión
-                            </button>
-                        </div>
-                    </form>
-
-                    <!-- Barra de progreso (inicialmente oculta) -->
-                    <div id="progressContainer" style="display: none;" class="mt-4">
-                        <div class="card border-info">
-                            <div class="card-body">
-                                <h5 class="card-title text-info">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>
-                                    Creando reunión...
-                                </h5>
-                                <p class="card-text mb-2">
-                                    Este proceso puede tomar varios minutos ya que se están creando registros para todos los propietarios.
-                                </p>
-                                <div class="progress mb-3" style="height: 30px;">
-                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" 
-                                         role="progressbar" style="width: 0%">
-                                        <span id="progressText">Iniciando...</span>
-                                    </div>
-                                </div>
-                                <small class="text-muted" id="progressDetails">
-                                    Preparando datos...
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resultado (inicialmente oculto) -->
-                    <div id="resultContainer" style="display: none;" class="mt-4">
-                        <div id="resultAlert" class="alert" role="alert">
-                            <span id="resultMessage"></span>
-                        </div>
-                    </div>
+                <div class="col-md-6">
+                    <md-outlined-text-field
+                        label="Hora de inicio"
+                        id="hora"
+                        name="hora"
+                        type="time"
+                        required>
+                        <md-icon slot="leading-icon" class="material-symbols-outlined">schedule</md-icon>
+                    </md-outlined-text-field>
                 </div>
             </div>
+
+            <div class="mb-4">
+                <md-outlined-text-field
+                    label="Monto de multa por inasistencia (Bs.)"
+                    id="monto_multa"
+                    name="monto_multa"
+                    type="number"
+                    value="100.0"
+                    step="0.01"
+                    min="0"
+                    supporting-text="Se asigna como sanción a quienes queden registrados como ausentes">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
+                </md-outlined-text-field>
+            </div>
+
+            <div class="notice mb-4">
+                <span class="material-symbols-outlined" style="color: rgb(var(--t-info));">info</span>
+                <div>Al confirmar, se generan las fichas de asistencia para todos los propietarios registrados.</div>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('reunion.list_reuniones') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit" id="submitBtn">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Programar reunión
+                </md-filled-button>
+            </div>
+        </form>
+
+        <div id="progressContainer" class="mt-4" style="display:none;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="spinner-border spinner-border-sm text-primary"></span>
+                <strong>Creando reunión y procesando propietarios…</strong>
+            </div>
+            <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>
+            <div class="text-muted small mt-2">Generando asistencias y multas por inasistencia. No cierres esta ventana.</div>
+        </div>
+
+        <div id="resultContainer" class="mt-4" style="display:none;">
+            <div id="resultAlert" class="alert" role="alert"><i id="resultIcon"></i><div id="resultMessage"></div></div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    // Manejar envío del formulario con AJAX
-    document.getElementById('reunionForm').addEventListener('submit', async function(e) {
+    document.getElementById('reunionForm').addEventListener('submit', async function (e) {
         e.preventDefault();
-        
-        // Obtener datos del formulario
-        const formData = new FormData(this);
-        const data = {
-            fecha: formData.get('fecha'),
-            hora: formData.get('hora'),
-            descripcion: formData.get('descripcion'),
-            monto_multa: formData.get('monto_multa') || 100.0
+
+        var descField = document.getElementById('descripcion');
+        var fechaField = document.getElementById('fecha');
+        var horaField = document.getElementById('hora');
+        var montoField = document.getElementById('monto_multa');
+
+        var data = {
+            fecha: fechaField.value,
+            hora: horaField.value,
+            descripcion: (descField.value || '').trim(),
+            monto_multa: parseFloat(montoField.value) || 100.0
         };
-        
-        // Mostrar barra de progreso
-        document.getElementById('progressContainer').style.display = 'block';
-        document.getElementById('resultContainer').style.display = 'none';
-        
-        // Deshabilitar formulario
-        const submitBtn = document.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
-        
-        // Simular progreso mientras se procesa
-        let progress = 0;
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-        const progressDetails = document.getElementById('progressDetails');
-        
-        // Actualizar progreso gradualmente
-        progressText.textContent = 'Creando reunión...';
-        progressDetails.textContent = 'Iniciando proceso de creación...';
-        
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            
-            progressBar.style.width = progress + '%';
-            progressText.textContent = `${Math.round(progress)}%`;
-            
-            if (progress < 30) {
-                progressDetails.textContent = 'Creando reunión base...';
-            } else if (progress < 60) {
-                progressDetails.textContent = 'Creando registros de asistencia...';
-            } else if (progress < 85) {
-                progressDetails.textContent = 'Generando multas por inasistencia...';
-            } else {
-                progressDetails.textContent = 'Finalizando proceso...';
-            }
-        }, 500);
-        
+
+        var btn = document.getElementById('submitBtn');
+        var progress = document.getElementById('progressContainer');
+        var result = document.getElementById('resultContainer');
+        var alertBox = document.getElementById('resultAlert');
+        var icon = document.getElementById('resultIcon');
+        var msg = document.getElementById('resultMessage');
+
+        btn.disabled = true;
+        progress.style.display = 'block';
+        result.style.display = 'none';
+
+        function show(ok, html) {
+            progress.style.display = 'none';
+            result.style.display = 'block';
+            alertBox.className = 'alert alert-' + (ok ? 'success' : 'danger');
+            icon.className = 'fas fa-' + (ok ? 'check-circle' : 'exclamation-circle');
+            msg.innerHTML = html;
+        }
+        function esc(v) {
+            var d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
+        }
+
         try {
-            // Enviar petición AJAX
-            const response = await fetch('/api/reuniones/create', {
+            var response = await fetch('/api/reuniones/create', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            
-            const result = await response.json();
-            
-            // Completar barra de progreso
-            clearInterval(progressInterval);
-            progressBar.style.width = '100%';
-            progressText.textContent = '100%';
-            progressDetails.textContent = 'Proceso completado!';
-            
-            // Mostrar resultado
-            setTimeout(() => {
-                document.getElementById('progressContainer').style.display = 'none';
-                const resultContainer = document.getElementById('resultContainer');
-                const resultAlert = document.getElementById('resultAlert');
-                const resultMessage = document.getElementById('resultMessage');
-                
-                resultContainer.style.display = 'block';
-                
-                if (result.success) {
-                    resultAlert.className = 'alert alert-success';
-                    resultMessage.innerHTML = `
-                        <i class="fas fa-check-circle me-2"></i>
-                        <strong>¡Éxito!</strong> ${result.message}
-                        <br><small>Se procesaron ${result.total_procesados} propietarios</small>
-                    `;
-                    
-                    // Redirigir después de 3 segundos
-                    setTimeout(() => {
-                        window.location.href = '/reuniones';
-                    }, 3000);
-                } else {
-                    resultAlert.className = 'alert alert-danger';
-                    resultMessage.innerHTML = `
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Error:</strong> ${result.error}
-                    `;
-                }
-            }, 1000);
-            
-        } catch (error) {
-            clearInterval(progressInterval);
-            console.error('Error:', error);
-            
-            document.getElementById('progressContainer').style.display = 'none';
-            const resultContainer = document.getElementById('resultContainer');
-            const resultAlert = document.getElementById('resultAlert');
-            const resultMessage = document.getElementById('resultMessage');
-            
-            resultContainer.style.display = 'block';
-            resultAlert.className = 'alert alert-danger';
-            resultMessage.innerHTML = `
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Error de conexión:</strong> ${error.message}
-            `;
-        } finally {
-            // Rehabilitar formulario
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-calendar-plus me-2"></i>Crear Reunión';
-        }
-    });
-    
-    // Permitir fechas pasadas y futuras para registrar reuniones históricas
-    // Se ha removido la restricción de fecha mínima para permitir anotaciones de reuniones pasadas
-</script>
+            var res = await response.json();
 
-<style>
-    .card {
-        border-radius: 0.5rem;
-        border: none;
-    }
-    
-    .card-header {
-        border-radius: 0.5rem 0.5rem 0 0 !important;
-        border-bottom: none;
-    }
-    
-    .form-control:focus {
-        border-color: #ffc107;
-        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
-    }
-    
-    .btn-warning {
-        background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
-        border: none;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        color: #212529;
-    }
-    
-    .btn-warning:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
-        color: #212529;
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-text {
-        font-size: 0.8rem;
-    }
-    
-    .input-group-text {
-        background-color: #ffc107;
-        color: #212529;
-        border: none;
-        font-weight: 600;
-    }
-</style>
+            if (res.success) {
+                show(true, '<strong>' + esc(res.message) + '</strong><br><small>Se procesaron ' + esc(res.total_procesados) + ' propietarios. Redirigiendo…</small>');
+                setTimeout(function () { window.location.href = "{{ url_for('reunion.list_reuniones') }}"; }, 2000);
+                return;
+            }
+            show(false, '<strong>Error:</strong> ' + esc(res.error));
+        } catch (err) {
+            show(false, '<strong>Error de conexión:</strong> ' + esc(err.message));
+        }
+
+        btn.disabled = false;
+    });
+</script>
 {% endblock %}

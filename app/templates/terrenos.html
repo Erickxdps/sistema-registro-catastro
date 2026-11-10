@@ -1,263 +1,140 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat, initials, empty_state, pagination %}
+
+{% block title %}Terrenos · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-warning text-dark">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-map-marked-alt"></i> Gestión de Terrenos
-                        </h4>
-                        {% if current_user.has_role('admin') %}
-                        <a href="{{ url_for('terreno.create_terreno') }}" class="btn btn-dark btn-sm">
-                            <i class="fas fa-plus"></i> Nuevo Terreno
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
+{% call page_header('Terrenos', 'Lotes registrados y sus propietarios asociados', 'fa-map-marked-alt') %}
+    {% if current_user.has_role('admin') %}
+    <a href="{{ url_for('terreno.create_terreno') }}" class="text-decoration-none">
+        <md-filled-button>
+            <md-icon slot="icon" class="material-symbols-outlined">add_location_alt</md-icon>
+            Nuevo terreno
+        </md-filled-button>
+    </a>
+    {% endif %}
+{% endcall %}
 
-                <div class="card-body">
-                    <!-- Barra de búsqueda -->
-                    <div class="row mb-3">
-                        <div class="col-md-8">
-                            <form method="GET" action="{{ url_for('terreno.list_terrenos') }}"
-                                class="d-flex align-items-center">
-                                <div class="input-group" style="max-width: 400px;">
-                                    <input type="text" name="search" class="form-control"
-                                        placeholder="Buscar por lugar, manzano o dueño..." value="{{ search }}">
-                                    <button class="btn btn-outline-warning" type="submit">
-                                        <i class="fas fa-search"></i>
-                                    </button>
+<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
+    <md-elevation></md-elevation>
+
+    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <form method="GET" action="{{ url_for('terreno.list_terrenos') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
+                <input type="text" name="search" class="form-control border-start-0" placeholder="Lugar, manzano o propietario..." value="{{ search or '' }}">
+            </div>
+            <md-filled-button type="submit">Buscar</md-filled-button>
+            {% if search %}
+            <a href="{{ url_for('terreno.list_terrenos') }}" class="text-decoration-none">
+                <md-outlined-button type="button">Limpiar</md-outlined-button>
+            </a>
+            {% endif %}
+        </form>
+        {% if terrenos_paginated and terrenos_paginated.total > 0 %}
+        <span class="text-muted small">
+            {{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + 1 }}–{{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + terrenos|length }}
+            de {{ terrenos_paginated.total }} terrenos
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="terrenosTable">
+            <thead>
+                <tr>
+                    <th class="ps-3">ID</th>
+                    <th>Propietario</th>
+                    <th>Lote</th>
+                    <th>Manzano</th>
+                    <th>Superficie</th>
+                    <th>Cuotas</th>
+                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for terreno in terrenos %}
+                <tr>
+                    <td class="text-muted num ps-3">#{{ terreno.id }}</td>
+                    <td>
+                        <div class="person">
+                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
+                                {{ initials(terreno.dueno.nombre, terreno.dueno.paterno) if terreno.dueno else '?' }}
+                            </div>
+                            <div>
+                                <div class="person-name fw-medium">
+                                    {% if terreno.dueno %}
+                                    {{ terreno.dueno.nombre }} {{ terreno.dueno.paterno or '' }} {{ terreno.dueno.materno or '' }}
+                                    {% else %}
+                                    <span class="text-danger">Sin propietario asignado</span>
+                                    {% endif %}
                                 </div>
-                                {% if search %}
-                                <a href="{{ url_for('terreno.list_terrenos') }}" class="btn btn-outline-secondary ms-2">
-                                    <i class="fas fa-times"></i> Limpiar
-                                </a>
-                                {% endif %}
+                                <div class="person-meta small text-muted">CI: {{ terreno.dueno.ci if terreno.dueno else '—' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="chip tone-info"><i class="fas fa-map-marker-alt me-1"></i>{{ terreno.lugar }}</span></td>
+                    <td><span class="chip tone-warning"><i class="fas fa-th me-1"></i>Mz. {{ terreno.manzano }}</span></td>
+                    <td class="num">{{ terreno.metros_cuadrados }} m²</td>
+                    <td>
+                        {% set cuotas = terreno.cuotas %}
+                        {% if cuotas %}
+                        <span class="chip tone-success"><i class="fas fa-receipt me-1"></i>{{ cuotas|length }} cuota{{ 's' if cuotas|length != 1 }}</span>
+                        {% else %}
+                        <span class="chip text-muted">Sin cuotas</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.has_role('admin') %}
+                    <td class="pe-3">
+                        <div class="row-actions justify-content-end gap-1">
+                            <a href="{{ url_for('terreno.update_terreno', id=terreno.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
+                            </a>
+                            <form method="post" action="{{ url_for('terreno.delete_terreno', id=terreno.id) }}"
+                                  data-confirm="¿Eliminar definitivamente el terreno {{ terreno.lugar }} - Manzano {{ terreno.manzano }}?">
+                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
+                                </button>
                             </form>
                         </div>
-                        <div class="col-md-4 text-end d-flex align-items-center justify-content-end">
-                            {% if terrenos_paginated and terrenos_paginated.total > 0 %}
-                            <small class="text-muted">
-                                <i class="fas fa-map-marked-alt"></i>
-                                {{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + 1 }}
-                                - {{ terrenos_paginated.per_page * (terrenos_paginated.page - 1) + terrenos|length }}
-                                de {{ terrenos_paginated.total }}
-                                {% if search %}<br><i class="fas fa-search"></i> "{{ search }}"{% endif %}
-                            </small>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Tabla de terrenos -->
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="terrenosTable">
-                            <thead class="table-warning">
-                                <tr>
-                                    <th><i class="fas fa-hashtag"></i> ID</th>
-                                    <th><i class="fas fa-user"></i> Propietario</th>
-                                    <th><i class="fas fa-map-marker-alt"></i> Lugar</th>
-                                    <th><i class="fas fa-th-large"></i> Manzano</th>
-                                    <th><i class="fas fa-ruler-combined"></i> Metros²</th>
-                                    <th><i class="fas fa-receipt"></i> Cuotas</th>
-                                    {% if current_user.has_role('admin') %}
-                                    <th><i class="fas fa-cogs"></i> Acciones</th>
-                                    {% endif %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for terreno in terrenos %}
-                                <tr>
-                                    <td>{{ terreno.id }}</td>
-                                    <td>
-                                        <strong>{{ terreno.dueno.nombre }}</strong>
-                                        {% if terreno.dueno.paterno %} {{ terreno.dueno.paterno }}{% endif %}
-                                        {% if terreno.dueno.materno %} {{ terreno.dueno.materno }}{% endif %}
-                                        <br>
-                                        <small class="text-muted">CI: {{ terreno.dueno.ci }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-info">{{ terreno.lugar }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-warning text-dark">{{ terreno.manzano }}</span>
-                                    </td>
-                                    <td>
-                                        <strong>{{ terreno.metros_cuadrados }}</strong> m²
-                                    </td>
-                                    <td>
-                                        {% set cuotas = terreno.cuotas %}
-                                        {% if cuotas %}
-                                        <span class="badge bg-success">{{ cuotas|length }} cuota{{ 's' if cuotas|length
-                                            != 1 else '' }}</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Sin cuotas</span>
-                                        {% endif %}
-                                    </td>
-                                    {% if current_user.has_role('admin') %}
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ url_for('terreno.update_terreno', id=terreno.id) }}"
-                                                class="btn btn-info btn-sm">
-                                                <i class="fas fa-edit"></i> Editar
-                                            </a>
-                                            <form method="post"
-                                                action="{{ url_for('terreno.delete_terreno', id=terreno.id) }}"
-                                                style="display: inline;">
-                                                <button type="submit" class="btn btn-danger btn-sm"
-                                                    onclick="return confirm('¿Está seguro de eliminar el terreno {{ terreno.lugar }} - Manzano {{ terreno.manzano }}?')">
-                                                    <i class="fas fa-trash"></i> Eliminar
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                    {% endif %}
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">
-                                        {% if search %}
-                                        <i class="fas fa-search"></i>
-                                        <h6 class="mt-2">No se encontraron terrenos</h6>
-                                        <p>No hay resultados para "{{ search }}"</p>
-                                        <a href="{{ url_for('terreno.list_terrenos') }}"
-                                            class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-list"></i> Ver todos los terrenos
-                                        </a>
-                                        {% else %}
-                                        <i class="fas fa-inbox"></i>
-                                        <h6 class="mt-2">No hay terrenos registrados</h6>
-                                        {% if current_user.has_role('admin') %}
-                                        <a href="{{ url_for('terreno.create_terreno') }}"
-                                            class="btn btn-warning btn-sm">
-                                            <i class="fas fa-plus"></i> Crear primer terreno
-                                        </a>
-                                        {% endif %}
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-
-                        <!-- Paginación -->
-                        {% if terrenos_paginated and terrenos_paginated.pages > 1 %}
-                        <nav aria-label="Navegación de páginas" class="mt-4">
-                            <ul class="pagination justify-content-center">
-                                <!-- Botón Anterior -->
-                                {% if terrenos_paginated.has_prev %}
-                                <li class="page-item">
-                                    <a class="page-link"
-                                        href="{{ url_for('terreno.list_terrenos', page=terrenos_paginated.prev_num, search=search) }}">
-                                        <i class="fas fa-chevron-left"></i> Anterior
-                                    </a>
-                                </li>
-                                {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link"><i class="fas fa-chevron-left"></i> Anterior</span>
-                                </li>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">
+                        {% if search %}
+                            {% call empty_state('fa-search', 'Sin resultados', 'No hay terrenos que coincidan con "' ~ search ~ '"') %}
+                                <a href="{{ url_for('terreno.list_terrenos') }}" class="btn btn-light btn-sm">Ver todos</a>
+                            {% endcall %}
+                        {% else %}
+                            {% call empty_state('fa-inbox', 'Aún no hay terrenos registrados', 'Registra el primer lote en el sistema.') %}
+                                {% if current_user.has_role('admin') %}
+                                <a href="{{ url_for('terreno.create_terreno') }}" class="btn btn-primary btn-sm">Registrar terreno</a>
                                 {% endif %}
-
-                                <!-- Números de página -->
-                                {% for page_num in terrenos_paginated.iter_pages(left_edge=1, right_edge=1,
-                                left_current=1, right_current=2) %}
-                                {% if page_num %}
-                                {% if page_num != terrenos_paginated.page %}
-                                <li class="page-item">
-                                    <a class="page-link"
-                                        href="{{ url_for('terreno.list_terrenos', page=page_num, search=search) }}">{{
-                                        page_num }}</a>
-                                </li>
-                                {% else %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ page_num }}</span>
-                                </li>
-                                {% endif %}
-                                {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link">…</span>
-                                </li>
-                                {% endif %}
-                                {% endfor %}
-
-                                <!-- Botón Siguiente -->
-                                {% if terrenos_paginated.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link"
-                                        href="{{ url_for('terreno.list_terrenos', page=terrenos_paginated.next_num, search=search) }}">
-                                        Siguiente <i class="fas fa-chevron-right"></i>
-                                    </a>
-                                </li>
-                                {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link">Siguiente <i class="fas fa-chevron-right"></i></span>
-                                </li>
-                                {% endif %}
-                            </ul>
-
-                            <!-- Selector de registros por página -->
-                            <div class="d-flex justify-content-center mt-3">
-                                <form method="GET" action="{{ url_for('terreno.list_terrenos') }}"
-                                    class="d-flex align-items-center">
-                                    <input type="hidden" name="search" value="{{ search }}">
-                                    <label class="form-label mb-0 me-2">Mostrar:</label>
-                                    <select name="per_page" class="form-select form-select-sm me-2" style="width: auto;"
-                                        onchange="this.form.submit()">
-                                        <option value="10" {% if request.args.get('per_page', '10' )=='10' %}selected{%
-                                            endif %}>10</option>
-                                        <option value="25" {% if request.args.get('per_page')=='25' %}selected{% endif
-                                            %}>25</option>
-                                        <option value="50" {% if request.args.get('per_page')=='50' %}selected{% endif
-                                            %}>50</option>
-                                        <option value="100" {% if request.args.get('per_page')=='100' %}selected{% endif
-                                            %}>100</option>
-                                    </select>
-                                    <span class="text-muted">por página</span>
-                                </form>
-                            </div>
-                        </nav>
+                            {% endcall %}
                         {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+
+    {% if terrenos_paginated and terrenos_paginated.pages > 1 %}
+    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
+        <form method="GET" action="{{ url_for('terreno.list_terrenos') }}" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="search" value="{{ search or '' }}">
+            <span class="small text-muted">Mostrar</span>
+            <select name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                {% for n in [10, 25, 50, 100] %}
+                <option value="{{ n }}" {% if request.args.get('per_page', '10') == n|string %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+            <span class="small text-muted">por página</span>
+        </form>
+        {{ pagination(terrenos_paginated, 'terreno.list_terrenos', search=search) }}
+    </div>
+    {% endif %}
 </div>
-
-<style>
-    .table-hover tbody tr:hover {
-        background-color: rgba(255, 193, 7, 0.1);
-    }
-
-    .btn-group .btn {
-        margin-right: 2px;
-    }
-
-    .card-header {
-        border-bottom: 3px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .badge {
-        font-size: 0.75em;
-    }
-
-    .pagination .page-link {
-        color: #ffc107;
-    }
-
-    .pagination .page-item.active .page-link {
-        background-color: #ffc107;
-        border-color: #ffc107;
-        color: #000;
-    }
-
-    .input-group .btn-outline-warning:hover {
-        background-color: #ffc107;
-        border-color: #ffc107;
-        color: #000;
-    }
-</style>
-
 {% endblock %}

@@ -1,107 +1,147 @@
-from flask import Blueprint, request, redirect, url_for, flash, jsonify, render_template # type: ignore
-from flask_login import login_required, current_user # type: ignore
+# controllers/terreno_controller.py
+# Controlador de terrenos — refactorizado para:
+#   1. Eliminar los if/else de autorización duplicados.
+#   2. Usar db.session.get() en vez del depreciado Query.get().
+#   3. Añadir manejo de errores explícito con try/except.
+#   4. Corregir el filtro de búsqueda: Terreno.manzano es Integer, no soporta ilike().
+#
+# IMPORTANTE: nombres de rutas, Blueprint y columnas de BD sin cambios.
+
+from flask import Blueprint, request, redirect, url_for, flash, render_template
+from flask_login import login_required
+from sqlalchemy import or_, cast, String
+from sqlalchemy.exc import IntegrityError
+
 from models.terreno_model import Terreno
-from models.duenio_model import Duenio
+from models.duenio_model  import Duenio
 from views import terreno_view
 from utils.decorators import role_required
 from database import db
-from sqlalchemy import or_  # Importar or_ para búsquedas
 
 terreno_bp = Blueprint("terreno", __name__)
 
-# Ruta para obtener la lista de terrenos con paginación y búsqueda
+
+# ─────────────────────────── LISTADO ─────────────────────────────────────────
+
 @terreno_bp.route("/terrenos")
 @login_required
 def list_terrenos():
-    # Obtener parámetros de búsqueda y paginación
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)  # 10 registros por página por defecto
-    search = request.args.get('search', '', type=str)
-    
-    # Construir la consulta base con join para búsqueda en dueño
+    """Lista paginada de terrenos con búsqueda por lugar, manzano o propietario."""
+    page     = request.args.get('page',     1,  type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    search   = request.args.get('search',   '', type=str)
+
+    # JOIN con Duenio para permitir búsqueda por atributos del propietario
     query = db.session.query(Terreno).join(Duenio)
-    
-    # Aplicar filtro de búsqueda si existe
+
     if search:
-        search_filter = f"%{search}%"
+        filtro = f"%{search}%"
         query = query.filter(
             or_(
-                Terreno.lugar.ilike(search_filter),
-                Terreno.manzano.ilike(search_filter),
-                Duenio.nombre.ilike(search_filter),
-                Duenio.paterno.ilike(search_filter),
-                Duenio.materno.ilike(search_filter),
-                Duenio.ci.ilike(search_filter)
+                Terreno.lugar.ilike(filtro),
+                # manzano es Integer: cast a String para poder usar ilike
+                cast(Terreno.manzano, String).ilike(filtro),
+                Duenio.nombre.ilike(filtro),
+                Duenio.paterno.ilike(filtro),
+                Duenio.materno.ilike(filtro),
+                Duenio.ci.ilike(filtro),
             )
         )
-    
-    # Aplicar paginación
-    terrenos_paginated = query.paginate(
-        page=page,
-        per_page=per_page,
-        error_out=False
-    )
-    
+
+    terrenos_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
     return terreno_view.list_terrenos(terrenos_paginated, search)
-     
-# Ruta para crear terrenos
+
+
+# ─────────────────────────── CREAR ───────────────────────────────────────────
+
 @terreno_bp.route("/terrenos/create", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def create_terreno():
+    """Crea un nuevo terreno asociado a un propietario."""
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            duenio_id = request.form["duenio_id"]
-            lugar = request.form["lugar"]
-            manzano = int(request.form["manzano"])
-            metros_cuadrados = float(request.form["metros_cuadrados"])  # Cambiado a float
-            terreno = Terreno(duenio_id=duenio_id, lugar=lugar, manzano=manzano, metros_cuadrados=metros_cuadrados)
+        duenio_id       = request.form.get("duenio_id",       type=int)
+        lugar           = request.form.get("lugar",           "").strip()
+        manzano         = request.form.get("manzano",         type=int)
+        metros_cuadrados = request.form.get("metros_cuadrados", type=float)
+
+        if not duenio_id or not lugar or manzano is None or metros_cuadrados is None:
+            flash("Todos los campos son obligatorios.", "error")
+            duenios = Duenio.query.all()
+            return render_template('create_terreno.html', duenios=duenios)
+
+        try:
+            terreno = Terreno(
+                duenio_id=duenio_id,
+                lugar=lugar,
+                manzano=manzano,
+                metros_cuadrados=metros_cuadrados,
+            )
             terreno.save()
-            flash("Terreno creado exitosamente", "success")
-            return redirect(url_for("terreno.list_terrenos"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
+            flash("Terreno creado exitosamente.", "success")
+        except IntegrityError:
+            db.session.rollback()
+            flash("Error al guardar el terreno. Verifica los datos.", "error")
+
+        return redirect(url_for("terreno.list_terrenos"))
+
     duenios = Duenio.query.all()
     return render_template('create_terreno.html', duenios=duenios)
 
-# Ruta para actualizar terrenos por ID
+
+# ─────────────────────────── ACTUALIZAR ──────────────────────────────────────
+
 @terreno_bp.route("/terrenos/<int:id>/update", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def update_terreno(id):
-    terreno = Terreno.query.get(id)
+    """Actualiza los datos de un terreno."""
+    terreno = db.session.get(Terreno, id)
     if not terreno:
-        return "Terreno no encontrado", 404
+        flash("Terreno no encontrado.", "error")
+        return redirect(url_for("terreno.list_terrenos"))
+
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            id_duenio = request.form["id_duenio"]
-            lugar = request.form["lugar"]
-            manzano = int(request.form["manzano"])
-            metros_cuadrados = float(request.form["metros_cuadrados"])
-            terreno.update(duenio_id=id_duenio, lugar=lugar, manzano=manzano, metros_cuadrados=metros_cuadrados)
-            flash("Terreno actualizado exitosamente", "success")
-            return redirect(url_for("terreno.list_terrenos"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
-    
+        duenio_id        = request.form.get("duenio_id",       type=int)
+        lugar            = request.form.get("lugar",            "").strip()
+        manzano          = request.form.get("manzano",          type=int)
+        metros_cuadrados = request.form.get("metros_cuadrados", type=float)
+
+        try:
+            terreno.update(
+                duenio_id=duenio_id,
+                lugar=lugar,
+                manzano=manzano,
+                metros_cuadrados=metros_cuadrados,
+            )
+            flash("Terreno actualizado exitosamente.", "success")
+        except Exception:
+            db.session.rollback()
+            flash("Error al actualizar el terreno.", "error")
+
+        return redirect(url_for("terreno.list_terrenos"))
+
     duenios = Duenio.query.all()
     return render_template('update_terreno.html', terreno=terreno, duenios=duenios)
 
-# Ruta para eliminar terrenos por ID
+
+# ─────────────────────────── ELIMINAR ────────────────────────────────────────
+
 @terreno_bp.route("/terrenos/<int:id>/delete", methods=["POST"])
 @login_required
 @role_required("admin")
 def delete_terreno(id):
-    terreno = Terreno.get_by_id(id)
+    """Elimina un terreno y sus cuotas y multas dependientes."""
+    terreno = db.session.get(Terreno, id)
     if not terreno:
-        flash("Terreno no encontrado", "error")
+        flash("Terreno no encontrado.", "error")
         return redirect(url_for("terreno.list_terrenos"))
-    if current_user.has_role("admin"):
-        try:
-            terreno.delete()
-            flash("Terreno eliminado exitosamente", "success")
-        except Exception as e:
-            flash("Error al eliminar el terreno", "error")
-        return redirect(url_for("terreno.list_terrenos"))
-    else:
-        return jsonify({"message": "Unauthorized"}), 403
+
+    try:
+        terreno.delete()
+        flash("Terreno eliminado exitosamente.", "success")
+    except Exception:
+        db.session.rollback()
+        flash("Error al eliminar el terreno.", "error")
+
+    return redirect(url_for("terreno.list_terrenos"))

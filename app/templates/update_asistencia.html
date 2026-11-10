@@ -1,174 +1,69 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Editar asistencia · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-warning text-white py-3">
-                    <h2 class="card-title mb-0 text-center">
-                        <i class="fas fa-edit"></i> Editar Asistencia
-                    </h2>
+<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
+    {% call page_header('Editar asistencia', 'Modifica el estado de presencia del propietario', 'fa-edit') %}{% endcall %}
+
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
+
+        <form method="post" id="updateAsistenciaForm">
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">person</span>
+                        Propietario
+                    </label>
+                    <select id="duenio_id" name="duenio_id" class="form-select" disabled>
+                        {% for duenio in duenios %}
+                        <option value="{{ duenio.id }}" {% if duenio.id == asistencia.duenio_id %}selected{% endif %}>
+                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="card-body p-4">
-                    <form method="post">
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <label for="duenio_id" class="form-label">
-                                    <i class="fas fa-user"></i> Propietario
-                                </label>
-                                <select id="duenio_id" name="duenio_id" required class="form-select form-select-lg" disabled>
-                                    {% for duenio in duenios %}
-                                        <option value="{{ duenio.id }}" 
-                                            {% if duenio.id == asistencia.duenio_id %}selected{% endif %}>
-                                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} - CI: {{ duenio.ci }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">
-                                    El propietario no puede ser modificado
-                                </small>
-                            </div>
-
-                            <div class="col-md-6 mb-4">
-                                <label for="id_reunion" class="form-label">
-                                    <i class="fas fa-calendar-alt"></i> Reunión
-                                </label>
-                                <select id="id_reunion" name="id_reunion" required class="form-select form-select-lg" disabled>
-                                    {% for reunion in reuniones %}
-                                        <option value="{{ reunion.id }}"
-                                            {% if reunion.id == asistencia.id_reunion %}selected{% endif %}>
-                                            {{ reunion.fecha }} {{ reunion.hora }} - {{ reunion.descripcion if reunion.descripcion else 'Sin descripción' }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">
-                                    La reunión no puede ser modificada
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="row justify-content-center mb-4">
-                            <div class="col-md-6">
-                                <div class="card border-warning">
-                                    <div class="card-body text-center">
-                                        <div class="form-check form-switch d-flex justify-content-center align-items-center">
-                                            <input class="form-check-input me-3" type="checkbox" id="asistio" name="asistio" 
-                                                   style="transform: scale(1.5);" {% if asistencia.asistio %}checked{% endif %}>
-                                            <label class="form-check-label fs-5 fw-bold" for="asistio">
-                                                <i class="fas fa-user-check text-warning"></i> ¿Asistió a la reunión?
-                                            </label>
-                                        </div>
-                                        <small class="form-text text-muted mt-2 d-block">
-                                            {% if asistencia.asistio %}
-                                                <span class="text-success"><i class="fas fa-check-circle"></i> Actualmente: Presente</span>
-                                            {% else %}
-                                                <span class="text-danger"><i class="fas fa-times-circle"></i> Actualmente: Ausente</span>
-                                            {% endif %}
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ url_for('asistencia.list_asistencias') }}" class="btn btn-outline-secondary me-md-2">
-                                <i class="fas fa-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-warning">
-                                <i class="fas fa-save"></i> Actualizar Asistencia
-                            </button>
-                        </div>
-                    </form>
+                <div class="col-md-6">
+                    <label for="id_reunion" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">calendar_today</span>
+                        Reunión
+                    </label>
+                    <select id="id_reunion" name="id_reunion" class="form-select" disabled>
+                        {% for reunion in reuniones %}
+                        <option value="{{ reunion.id }}" {% if reunion.id == asistencia.id_reunion %}selected{% endif %}>
+                            {{ reunion.fecha }} {{ reunion.hora }} · {{ reunion.descripcion if reunion.descripcion else 'Sin descripción' }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
-        </div>
+
+            <div class="p-3 rounded mb-4" style="background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem;">
+                <md-checkbox id="asistio" name="asistio" value="true" touch-target="wrapper" {% if asistencia.asistio %}checked{% endif %}></md-checkbox>
+                <label for="asistio" class="mb-0 user-select-none" style="cursor: pointer;">
+                    <div class="fw-semibold">¿Asistió a la reunión?</div>
+                    <div class="small mt-1">
+                        {% if asistencia.asistio %}
+                        <span class="text-success fw-medium"><i class="fas fa-check-circle me-1"></i>Actualmente: presente</span>
+                        {% else %}
+                        <span class="text-danger fw-medium"><i class="fas fa-times-circle me-1"></i>Actualmente: ausente</span>
+                        {% endif %}
+                    </div>
+                </label>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('asistencia.list_asistencias') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Actualizar asistencia
+                </md-filled-button>
+            </div>
+        </form>
     </div>
 </div>
-
-<style>
-    .card {
-        border-radius: 0.5rem;
-        border: none;
-    }
-    
-    .card-header {
-        border-radius: 0.5rem 0.5rem 0 0 !important;
-        border-bottom: none;
-        background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
-    }
-    
-    .form-control:focus, .form-select:focus {
-        border-color: #ffc107;
-        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
-    }
-    
-    .form-check-input:checked {
-        background-color: #ffc107;
-        border-color: #ffc107;
-    }
-    
-    .form-check-input:focus {
-        border-color: #ffc107;
-        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
-    }
-    
-    .btn-warning {
-        background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-        border: none;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        color: #212529;
-    }
-    
-    .btn-warning:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
-        background: linear-gradient(135deg, #e0a800 0%, #dc6545 100%);
-        color: #212529;
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-text {
-        font-size: 0.8rem;
-    }
-    
-    .border-warning {
-        border-color: #ffc107 !important;
-    }
-    
-    .card-body .card {
-        transition: all 0.3s ease;
-    }
-    
-    .card-body .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(255, 193, 7, 0.15);
-    }
-    
-    .form-select:disabled, .form-control:disabled {
-        background-color: #f8f9fa;
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-</style>
-
-<script>
-    // Cambiar el valor del checkbox para que se envíe correctamente
-    document.getElementById('asistio').addEventListener('change', function() {
-        this.value = this.checked ? 'true' : 'false';
-    });
-    
-    // Inicializar el valor al cargar la página
-    document.addEventListener('DOMContentLoaded', function() {
-        const checkbox = document.getElementById('asistio');
-        checkbox.value = checkbox.checked ? 'true' : 'false';
-    });
-</script>
 {% endblock %}

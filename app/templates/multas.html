@@ -1,402 +1,222 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat, initials, empty_state %}
 
-{% block title %}Gestión de Multas{% endblock %}
+{% block title %}Multas · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-danger text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-gavel"></i> Gestión de Multas 😡
-                        </h4>
-                        <a href="{{ url_for('multa.create_multa') }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-plus"></i> Nueva Multa
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body">
-                    {% if multas %}
-                    <!-- Estadísticas generales -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6><i class="fas fa-chart-line"></i> Estadísticas Generales</h6>
-                            <div class="row">
-                                {% set duenos_unicos = multas|map(attribute='duenio.id')|unique|list %}
-                                {% set total_duenos = duenos_unicos|length %}
-                                {% set total_multas = multas|length %}
-                                {% set multas_inasistencia = multas|selectattr('tipo', 'equalto', 'inasistencia')|list|length %}
-                                {% set monto_total = multas|sum(attribute='monto') %}
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-info">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-info">
-                                                <i class="fas fa-users"></i> Propietarios
-                                            </h5>
-                                            <h3 class="text-info">{{ total_duenos }}</h3>
-                                            <small class="text-muted">Con multas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-danger">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-danger">
-                                                <i class="fas fa-gavel"></i> Total Multas
-                                            </h5>
-                                            <h3 class="text-danger">{{ total_multas }}</h3>
-                                            <small class="text-muted">Registradas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-warning">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-warning">
-                                                <i class="fas fa-user-times"></i> Inasistencias
-                                            </h5>
-                                            <h3 class="text-warning">{{ multas_inasistencia }}</h3>
-                                            <small class="text-muted">Por ausencia</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-success">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-success">
-                                                <i class="fas fa-dollar-sign"></i> Total
-                                            </h5>
-                                            <h3 class="text-success">Bs. {{ monto_total|int }}</h3>
-                                            <small class="text-muted">Monto total</small>
-                                        </div>
-                                    </div>
-                                </div>
+{% call page_header('Multas', 'Resumen por propietario y detalle de cada sanción', 'fa-gavel') %}
+    {% if current_user.has_role('admin') %}
+    <a href="{{ url_for('multa.create_multa') }}" class="text-decoration-none">
+        <md-filled-button>
+            <md-icon slot="icon" class="material-symbols-outlined">add_circle</md-icon>
+            Nueva multa
+        </md-filled-button>
+    </a>
+    {% endif %}
+{% endcall %}
+
+{# Agrupación eficiente O(N) por propietario en un solo paso #}
+{% set grupos = {} %}
+{% for m in multas if m.duenio %}
+    {% set did = m.duenio.id %}
+    {% if did not in grupos %}
+        {% set _ = grupos.update({did: {'duenio': m.duenio, 'multas': []}}) %}
+    {% endif %}
+    {% set _ = grupos[did]['multas'].append(m) %}
+{% endfor %}
+
+{% if multas %}
+{% set total_monto = multas|sum(attribute='monto') %}
+<div class="stats">
+    {{ stat('Propietarios sancionados', grupos|length, 'fa-users', 'brand') }}
+    {{ stat('Multas registradas', multas|length, 'fa-gavel', 'danger') }}
+    {{ stat('Monto acumulado', 'Bs. ' ~ '%.2f'|format(total_monto), 'fa-money-bill-wave', 'success') }}
+</div>
+{% endif %}
+
+<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
+    <md-elevation></md-elevation>
+
+    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="input-group" style="max-width: 380px;">
+            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
+            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Buscar por propietario o CI...">
+        </div>
+        <span class="text-muted small" id="conteoFilas"></span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="dueniosMultasTable">
+            <thead>
+                <tr>
+                    <th class="ps-3">Propietario</th>
+                    <th>Multas y monto</th>
+                    <th>Terrenos</th>
+                    <th class="text-end pe-3">Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for did, g in grupos.items() %}
+                {% set dueno = g.duenio %}
+                {% set multas_dueno = g.multas %}
+                {% set suma_dueno = multas_dueno|sum(attribute='monto') %}
+                {% set inasistencias = multas_dueno|selectattr('tipo', 'equalto', 'asistencia')|list|length %}
+                {% set cuotas_m = multas_dueno|selectattr('tipo', 'equalto', 'cuota')|list|length %}
+                {% set otras = multas_dueno|length - inasistencias - cuotas_m %}
+
+                {% set detalle = [] %}
+                {% for m in multas_dueno %}
+                    {% set _ = detalle.append({
+                        'id': m.multa_id,
+                        'tipo': m.tipo,
+                        'descripcion': m.descripcion or '',
+                        'monto': m.monto|float,
+                        'fecha': m.fecha.strftime('%d/%m/%Y') if m.fecha else ''
+                    }) %}
+                {% endfor %}
+
+                <tr class="fila-dueno">
+                    <td class="ps-3">
+                        <div class="person">
+                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
+                                {{ initials(dueno.nombre, dueno.paterno) }}
+                            </div>
+                            <div>
+                                <div class="person-name fw-medium">{{ dueno.nombre }} {{ dueno.paterno or '' }} {{ dueno.materno or '' }}</div>
+                                <div class="person-meta small text-muted">CI: {{ dueno.ci or 'Sin CI' }}</div>
                             </div>
                         </div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="dueniosMultasTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Propietario</th>
-                                    <th>Resumen de Multas</th>
-                                    <th>Terrenos</th>
-                                    <th>Ver Detalles</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% set duenos_procesados = [] %}
-                                {% for multa in multas %}
-                                    {% if multa.duenio.id not in duenos_procesados %}
-                                        {% set _ = duenos_procesados.append(multa.duenio.id) %}
-                                        {% set multas_dueno = multas|selectattr('duenio.id', 'equalto', multa.duenio.id)|list %}
-                                        {% set inasistencia_count = multas_dueno|selectattr('tipo', 'equalto', 'inasistencia')|list|length %}
-                                        {% set otras_count = multas_dueno|selectattr('tipo', 'ne', 'inasistencia')|list|length %}
-                                        {% set total_dueno = multas_dueno|length %}
-                                        {% set monto_total_dueno = multas_dueno|sum(attribute='monto') %}
-                                        {% set terrenos_dueno = multa.duenio.terrenos %}
-                                        
-                                        <tr>
-                                            <td><strong>#{{ multa.duenio.id }}</strong></td>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="me-3">
-                                                        <div class="avatar bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; font-size: 14px; font-weight: 600;">
-                                                            {{ multa.duenio.nombre[0]|upper }}{{ (multa.duenio.paterno[0] if multa.duenio.paterno else '')|upper }}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <strong>{{ multa.duenio.nombre }} {{ multa.duenio.paterno or '' }} {{ multa.duenio.materno or '' }}</strong>
-                                                        <br><small class="text-muted">CI: {{ multa.duenio.ci or 'Sin CI' }}</small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex gap-2 mb-2">
-                                                    <span class="badge bg-warning">
-                                                        <i class="fas fa-user-times"></i> {{ inasistencia_count }} Inasistencia
-                                                    </span>
-                                                    {% if otras_count > 0 %}
-                                                    <span class="badge bg-info">
-                                                        <i class="fas fa-exclamation-triangle"></i> {{ otras_count }} Otras
-                                                    </span>
-                                                    {% endif %}
-                                                </div>
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <small class="text-muted">Total: {{ total_dueno }} multas</small>
-                                                    <strong class="text-danger">Bs. {{ monto_total_dueno|int }}</strong>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    {% for terreno in terrenos_dueno %}
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="fas fa-map-marker-alt"></i> {{ terreno.lugar }} - Mz. {{ terreno.manzano }}
-                                                    </span>
-                                                    {% endfor %}
-                                                </div>
-                                                <small class="text-info d-block mt-1">{{ terrenos_dueno|length }} terreno{% if terrenos_dueno|length != 1 %}s{% endif %} total</small>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-outline-danger btn-sm verMultasBtn"
-                                                    data-dueno="{{ multa.duenio.id }}"
-                                                    data-nombre="{{ multa.duenio.nombre }} {{ multa.duenio.paterno or '' }}"
-                                                    data-multas='[{% for m in multas_dueno %}{"id": {{ m.multa_id }}, "tipo": "{{ m.tipo }}", "descripcion": "{{ m.descripcion }}", "monto": {{ m.monto }}, "fecha": "{{ m.fecha.strftime('%d/%m/%Y') }}"}{% if not loop.last %},{% endif %}{% endfor %}]'>
-                                                    <i class="fas fa-eye"></i> Ver Multas
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    {% endif %}
-                                {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <i class="fas fa-gavel fa-3x mb-3 text-muted opacity-50"></i>
-                                            <h5 class="text-muted">Sin registros</h5>
-                                            <p class="mb-0">No hay multas registradas</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para ver multas -->
-<div class="modal fade" id="verMultasModal" tabindex="-1" aria-labelledby="verMultasModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="verMultasModalLabel">
-          <i class="fas fa-gavel"></i> Historial de Multas - <span id="nombreDuenoMultas"></span>
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div id="contenidoMultas">
-          <div class="text-center">
-            <div class="spinner-border text-danger" role="status">
-              <span class="visually-hidden">Cargando...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times"></i> Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<style>
-.table-hover tbody tr:hover {
-    background-color: rgba(220, 53, 69, 0.1);
-}
-.btn-group .btn { margin-right: 2px; }
-.card-header { border-bottom: 3px solid rgba(255, 255, 255, 0.2); }
-.badge { font-size: 0.75em; }
-.avatar {
-    font-weight: 600;
-    font-size: 11px !important;
-}
-</style>
-
-<script>
-// Variable global para el modal
-let modalMultas = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar el modal
-    const modalElement = document.getElementById('verMultasModal');
-    if (modalElement) {
-        modalMultas = new bootstrap.Modal(modalElement);
-    }
-    
-    // Manejar clicks en los botones "Ver"
-    document.querySelectorAll('.verMultasBtn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const duenioId = this.dataset.dueno;
-            const nombreDuenio = this.dataset.nombre;
-            const multasData = this.dataset.multas ? JSON.parse(this.dataset.multas) : [];
-            
-            // Actualizar título del modal
-            document.getElementById('nombreDuenoMultas').textContent = nombreDuenio;
-            
-            // Mostrar spinner mientras carga
-            document.getElementById('contenidoMultas').innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-danger" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando historial de multas...</p>
-                </div>`;
-            
-            // Mostrar modal
-            if (modalMultas) {
-                modalMultas.show();
-            }
-            
-            // Generar contenido del historial
-            setTimeout(() => {
-                mostrarHistorialMultas(duenioId, nombreDuenio, multasData);
-            }, 500);
-        });
-    });
-});
-
-function mostrarHistorialMultas(duenioId, nombreDuenio, multasData) {
-    // Construir la tabla de multas
-    let contenidoHTML = `
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th><i class="fas fa-tag text-warning"></i> Tipo</th>
-                        <th><i class="fas fa-comment text-info"></i> Descripción</th>
-                        <th><i class="fas fa-dollar-sign text-success"></i> Monto</th>
-                        <th><i class="fas fa-calendar text-primary"></i> Fecha</th>
-                        <th class="text-center"><i class="fas fa-cogs"></i> Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-    if (multasData && multasData.length > 0) {
-        let totalMonto = 0;
-        let inasistencias = 0;
-        
-        multasData.forEach(multa => {
-            totalMonto += parseFloat(multa.monto);
-            if (multa.tipo === 'inasistencia') inasistencias++;
-            
-            let tipoBadge = '';
-            if (multa.tipo === 'inasistencia') {
-                tipoBadge = '<span class="badge bg-warning"><i class="fas fa-user-times"></i> Inasistencia</span>';
-            } else if (multa.tipo === 'incumplimiento') {
-                tipoBadge = '<span class="badge bg-danger"><i class="fas fa-exclamation-triangle"></i> Incumplimiento</span>';
-            } else {
-                tipoBadge = `<span class="badge bg-info"><i class="fas fa-info-circle"></i> ${multa.tipo.charAt(0).toUpperCase() + multa.tipo.slice(1)}</span>`;
-            }
-            
-            contenidoHTML += `
-                <tr>
-                    <td>${tipoBadge}</td>
-                    <td>
-                        <span class="text-dark">${multa.descripcion}</span>
                     </td>
                     <td>
-                        <strong class="text-danger">Bs. ${parseFloat(multa.monto).toFixed(0)}</strong>
+                        <div class="d-flex flex-wrap gap-1 mb-1">
+                            {% if inasistencias %}<span class="chip tone-warning"><i class="fas fa-user-times me-1"></i>{{ inasistencias }} inasistencia{{ 's' if inasistencias != 1 }}</span>{% endif %}
+                            {% if cuotas_m %}<span class="chip tone-danger"><i class="fas fa-receipt me-1"></i>{{ cuotas_m }} cuota{{ 's' if cuotas_m != 1 }}</span>{% endif %}
+                            {% if otras %}<span class="chip tone-info">{{ otras }} otra{{ 's' if otras != 1 }}</span>{% endif %}
+                        </div>
+                        <span class="fw-bold text-danger num">Bs. {{ '%.2f'|format(suma_dueno) }}</span>
+                        <span class="text-muted small">({{ multas_dueno|length }} total)</span>
                     </td>
                     <td>
-                        <small class="text-muted">${multa.fecha}</small>
-                    </td>
-                    <td class="text-center">
-                        <div class="btn-group btn-group-sm">
-                            <a href="/multas/${multa.id}/update" 
-                               class="btn btn-outline-info btn-sm" 
-                               title="Editar multa">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button onclick="confirmarEliminacionMulta(${multa.id})" 
-                                    class="btn btn-outline-danger btn-sm" 
-                                    title="Eliminar multa">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for terreno in dueno.terrenos %}
+                            <span class="chip"><i class="fas fa-map-marker-alt me-1"></i>{{ terreno.lugar }} · Mz. {{ terreno.manzano }}</span>
+                            {% else %}
+                            <span class="text-muted small">Sin terrenos</span>
+                            {% endfor %}
                         </div>
                     </td>
-                </tr>`;
-        });
-        
-        // Calcular estadísticas
-        const otrasMultas = multasData.length - inasistencias;
-        
-        contenidoHTML += `
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Resumen de estadísticas -->
-        <div class="row mt-3">
-            <div class="col-12">
-                <div class="alert alert-light border">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <i class="fas fa-gavel text-danger"></i>
-                            <strong class="d-block">Total multas</strong>
-                            <span class="text-muted">${multasData.length}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <i class="fas fa-user-times text-warning"></i>
-                            <strong class="d-block">Inasistencias</strong>
-                            <span class="text-warning">${inasistencias}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <i class="fas fa-exclamation-triangle text-info"></i>
-                            <strong class="d-block">Otras causas</strong>
-                            <span class="text-info">${otrasMultas}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <i class="fas fa-dollar-sign text-success"></i>
-                            <strong class="d-block">Monto total</strong>
-                            <span class="text-danger">Bs. ${totalMonto.toFixed(0)}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    } else {
-        contenidoHTML += `
-            <tr>
-                <td colspan="5" class="text-center text-muted py-5">
-                    <div class="d-flex flex-column align-items-center">
-                        <i class="fas fa-gavel fa-3x mb-3 text-muted opacity-50"></i>
-                        <h5 class="text-muted">Sin registros</h5>
-                        <p class="mb-0">No hay multas registradas para <strong>${nombreDuenio}</strong></p>
-                    </div>
-                </td>
-            </tr>
+                    <td class="text-end pe-3">
+                        <button class="btn btn-outline-primary btn-sm btn-ver-multas"
+                                data-nombre="{{ dueno.nombre }} {{ dueno.paterno or '' }}"
+                                data-duenioid="{{ dueno.id }}"
+                                data-multas='{{ detalle|tojson }}'>
+                            <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
+                            Ver multas
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">{{ empty_state('fa-gavel', 'Sin multas', 'No hay multas registradas en la base de datos.') }}</td></tr>
+                {% endfor %}
             </tbody>
         </table>
-    </div>`;
-    }
-    
-    // Actualizar contenido del modal
-    document.getElementById('contenidoMultas').innerHTML = contenidoHTML;
-}
+    </div>
+</div>
 
-function confirmarEliminacionMulta(multaId) {
-    if (confirm('¿Está seguro de que desea eliminar esta multa?\\n\\nEsta acción no se puede deshacer.')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/multas/${multaId}/delete`;
-        
-        const csrfToken = document.querySelector('meta[name=csrf-token]');
-        if (csrfToken) {
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrf_token';
-            csrfInput.value = csrfToken.getAttribute('content');
-            form.appendChild(csrfInput);
+<!-- Modal de detalle de multas -->
+<div class="modal fade" id="verMultasModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold">Historial de multas</h5>
+                    <div class="text-muted small" id="nombreDuenoMultas"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-0" id="contenidoMultas"></div>
+            <div class="modal-footer justify-content-between" id="resumenMultas"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var modalEl = document.getElementById('verMultasModal');
+        var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+
+        function esc(v) {
+            var d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
         }
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
+
+        function chipTipo(tipo) {
+            if (tipo === 'asistencia') return '<span class="chip tone-warning"><i class="fas fa-user-times me-1"></i>Inasistencia</span>';
+            if (tipo === 'cuota') return '<span class="chip tone-danger"><i class="fas fa-receipt me-1"></i>Cuota pendiente</span>';
+            var t = String(tipo || 'otros').replace(/_/g, ' ');
+            return '<span class="chip tone-info">' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + '</span>';
+        }
+
+        function mostrar(nombre, data, duenioId) {
+            document.getElementById('nombreDuenoMultas').textContent = nombre;
+            var body = document.getElementById('contenidoMultas');
+            var resumen = document.getElementById('resumenMultas');
+
+            if (!data || !data.length) {
+                body.innerHTML = '<div class="empty p-4 text-center"><i class="fas fa-gavel fa-2x mb-2 text-muted"></i><h6>Sin multas</h6></div>';
+                resumen.innerHTML = '';
+                return;
+            }
+
+            var total = 0;
+            var filas = data.map(function (m) {
+                total += m.monto;
+                return '<tr>' +
+                    '<td class="ps-3">' + chipTipo(m.tipo) + '</td>' +
+                    '<td>' + (m.descripcion ? esc(m.descripcion) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td class="num fw-bold text-danger">Bs. ' + m.monto.toFixed(2) + '</td>' +
+                    '<td class="num text-muted pe-3">' + esc(m.fecha) + '</td>' +
+                    '</tr>';
+            }).join('');
+
+            body.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
+                '<thead><tr><th class="ps-3">Tipo</th><th>Descripción</th><th>Monto</th><th class="pe-3">Fecha</th></tr></thead>' +
+                '<tbody>' + filas + '</tbody></table></div>';
+
+            resumen.innerHTML = '<div>Total acumulado: <strong class="text-danger num">Bs. ' + total.toFixed(2) + '</strong> (' + data.length + ' multas)</div>' +
+                '<form method="post" action="/multas/duenio/' + duenioId + '/eliminar_todas" data-confirm="¿Regularizar y eliminar todas las multas de este propietario?">' +
+                '<button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-check-double me-1"></i>Marcar todas pagadas</button>' +
+                '</form>';
+        }
+
+        document.querySelectorAll('.btn-ver-multas').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var nombre = this.getAttribute('data-nombre');
+                var duenioId = this.getAttribute('data-duenioid');
+                var data = JSON.parse(this.getAttribute('data-multas') || '[]');
+                mostrar(nombre, data, duenioId);
+                if (modal) modal.show();
+            });
+        });
+
+        // Filtro de tabla en cliente
+        var filtro = document.getElementById('filtroTabla');
+        var filas = document.querySelectorAll('.fila-dueno');
+        var conteo = document.getElementById('conteoFilas');
+        if (filtro) {
+            filtro.addEventListener('input', function () {
+                var q = (this.value || '').trim().toLowerCase(), n = 0;
+                filas.forEach(function (f) {
+                    var ok = f.textContent.toLowerCase().indexOf(q) > -1;
+                    f.style.display = ok ? '' : 'none';
+                    if (ok) n++;
+                });
+                if (conteo) conteo.textContent = n + ' propietario' + (n !== 1 ? 's' : '');
+            });
+        }
+    })();
 </script>
 {% endblock %}

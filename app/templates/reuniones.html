@@ -1,428 +1,180 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat, empty_state %}
+
+{% block title %}Reuniones · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-info text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-calendar-alt"></i> Gestión de Reuniones
-                        </h4>
-                        {% if current_user.has_role('admin') %}
-                        <a href="{{ url_for('reunion.create_reunion') }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-plus"></i> Nueva Reunión
-                        </a>
+{% call page_header('Reuniones', 'Reuniones programadas, asambleas y convocatorias', 'fa-calendar-alt') %}
+    {% if current_user.has_role('admin') %}
+    <a href="{{ url_for('reunion.create_reunion') }}" class="text-decoration-none">
+        <md-filled-button>
+            <md-icon slot="icon" class="material-symbols-outlined">add_circle</md-icon>
+            Nueva reunión
+        </md-filled-button>
+    </a>
+    {% endif %}
+{% endcall %}
+
+{% if reuniones %}
+{% set futuras = reuniones|selectattr('fecha', 'ge', today)|list|length if today is defined else 0 %}
+<div class="stats">
+    {{ stat('Reuniones registradas', reuniones|length, 'fa-calendar-check', 'info') }}
+    {{ stat('Próximas u hoy', futuras, 'fa-calendar-plus', 'success') }}
+    {{ stat('Realizadas', (reuniones|length - futuras) if (reuniones|length - futuras) >= 0 else reuniones|length, 'fa-calendar-minus', 'neutral') }}
+</div>
+{% endif %}
+
+<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
+    <md-elevation></md-elevation>
+
+    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="input-group" style="max-width: 380px;">
+            <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
+            <input type="text" class="form-control border-start-0" id="filtroTabla" placeholder="Filtrar por tema, descripción o fecha...">
+        </div>
+        <span class="text-muted small" id="conteoFilas"></span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="reunionesTable">
+            <thead>
+                <tr>
+                    <th class="ps-3">ID</th>
+                    <th>Descripción / Asunto</th>
+                    <th>Fecha y hora</th>
+                    <th>Multa inasistencia</th>
+                    <th>Estado</th>
+                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for reunion in reuniones %}
+                <tr class="fila">
+                    <td class="text-muted num ps-3">#{{ reunion.id }}</td>
+                    <td class="fw-semibold">{{ reunion.descripcion }}</td>
+                    <td>
+                        <div class="num fw-medium">{{ reunion.fecha }}</div>
+                        <div class="small text-muted"><i class="fas fa-clock me-1"></i>{{ reunion.hora }}</div>
+                    </td>
+                    <td class="num">
+                        {% if reunion.monto_multa and reunion.monto_multa > 0 %}
+                        <span class="chip tone-danger">Bs. {{ '%.2f'|format(reunion.monto_multa) }}</span>
+                        {% else %}
+                        <span class="chip text-muted">Sin multa</span>
                         {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    {% include 'buscar.html' %}
-                    
-                    <!-- Estadísticas de reuniones -->
-                    {% if reuniones %}
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6><i class="fas fa-chart-line"></i> Estadísticas de Reuniones</h6>
-                            <div class="row">
-                                {% set total_reuniones = reuniones|length %}
-                                {% set fechas_pasadas = [] %}
-                                {% set fechas_futuras = [] %}
-                                {% for reunion in reuniones %}
-                                    {% if reunion.fecha < today %}
-                                        {% set _ = fechas_pasadas.append(reunion) %}
-                                    {% else %}
-                                        {% set _ = fechas_futuras.append(reunion) %}
-                                    {% endif %}
-                                {% endfor %}
-                                
-                                <div class="col-md-4 mb-3">
-                                    <div class="card border-info">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-info">
-                                                <i class="fas fa-calendar-check"></i> Total
-                                            </h5>
-                                            <h3 class="text-info">{{ total_reuniones }}</h3>
-                                            <small class="text-muted">Reuniones registradas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-4 mb-3">
-                                    <div class="card border-success">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-success">
-                                                <i class="fas fa-calendar-plus"></i> Próximas
-                                            </h5>
-                                            <h3 class="text-success">{{ fechas_futuras|length }}</h3>
-                                            <small class="text-muted">Por realizarse</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-4 mb-3">
-                                    <div class="card border-secondary">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-secondary">
-                                                <i class="fas fa-calendar-minus"></i> Pasadas
-                                            </h5>
-                                            <h3 class="text-secondary">{{ fechas_pasadas|length }}</h3>
-                                            <small class="text-muted">Ya realizadas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    </td>
+                    <td>
+                        {% if today is defined and reunion.fecha > today %}
+                        <span class="chip tone-success"><i class="fas fa-calendar-plus me-1"></i>Próxima</span>
+                        {% elif today is defined and reunion.fecha == today %}
+                        <span class="chip tone-warning"><i class="fas fa-calendar-day me-1"></i>Hoy</span>
+                        {% else %}
+                        <span class="chip"><i class="fas fa-calendar-check me-1"></i>Realizada</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.has_role('admin') %}
+                    <td class="pe-3">
+                        <div class="row-actions justify-content-end gap-1">
+                            <a href="{{ url_for('reunion.update_reunion', id=reunion.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
+                            </a>
+                            <button type="button" class="btn btn-outline-danger btn-icon btn-sm btn-eliminar" title="Eliminar"
+                                    data-id="{{ reunion.id }}" data-descripcion="{{ reunion.descripcion or 'Sin descripción' }}">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
+                            </button>
                         </div>
-                    </div>
+                    </td>
                     {% endif %}
-                    
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="reunionesTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Descripción</th>
-                                    <th>Fecha y Hora</th>
-                                    <th>Estado</th>
-                                    {% if current_user.has_role('admin') %}
-                                    <th>Acciones</th>
-                                    {% endif %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for reunion in reuniones %}
-                                <tr>
-                                    <td><strong>#{{ reunion.id }}</strong></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-2">
-                                                <i class="fas fa-calendar-alt text-info"></i>
-                                            </div>
-                                            <div>
-                                                <strong>{{ reunion.descripcion }}</strong>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <strong>{{ reunion.fecha }}</strong>
-                                            <br><small class="text-muted">
-                                                <i class="fas fa-clock"></i> {{ reunion.hora }}
-                                            </small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% set reunion_date = reunion.fecha %}
-                                        {% if reunion_date > today %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-calendar-plus"></i> Próxima
-                                            </span>
-                                        {% elif reunion_date == today %}
-                                            <span class="badge bg-warning">
-                                                <i class="fas fa-calendar-day"></i> Hoy
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">
-                                                <i class="fas fa-calendar-check"></i> Realizada
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    {% if current_user.has_role('admin') %}
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ url_for('reunion.update_reunion', id=reunion.id) }}" 
-                                               class="btn btn-info btn-sm">
-                                                <i class="fas fa-edit"></i> Editar
-                                            </a>
-                                            <form method="post" action="{{ url_for('reunion.delete_reunion', id=reunion.id) }}" style="display: inline;">
-                                                <button type="button" class="btn btn-danger btn-sm"
-                                                        onclick="eliminarReunionConProgreso({{ reunion.id }}, '{{ reunion.descripcion }}', '{{ reunion.descripcion }}')">
-                                                    <i class="fas fa-trash"></i> Eliminar
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                    {% endif %}
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">
-                                        <i class="fas fa-inbox"></i> No hay reuniones registradas
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">{{ empty_state('fa-calendar-alt', 'Sin reuniones', 'No hay reuniones registradas.') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal de progreso -->
+<div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-danger mb-3" role="status"></div>
+                <h6 class="mb-1 fw-bold">Eliminando reunión</h6>
+                <div class="text-muted small mb-3" id="progressTema"></div>
+                <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated bg-danger" style="width:100%"></div></div>
+                <div class="text-muted small mt-3">Se eliminan también las asistencias y multas generadas.</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de progreso para eliminación de reuniones -->
-<div class="modal fade" id="deleteReunionProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<!-- Modal de resultado -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-trash-alt"></i> Eliminando Reunión
-                </h5>
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="resultTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body">
-                <div class="text-center mb-3">
-                    <i class="fas fa-calendar-times fa-3x text-warning mb-3"></i>
-                    <h6 id="deleteReunionMessage">Eliminando reunión: <span id="deleteReunionTema"></span></h6>
-                    <p class="text-muted mb-2">
-                        Esta operación eliminará la reunión y todos los datos asociados (asistencias, multas).
-                    </p>
-                </div>
-                <div class="progress mb-3" style="height: 25px;">
-                    <div id="deleteReunionProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-danger" 
-                         role="progressbar" style="width: 0%">
-                        <span id="deleteReunionProgressText">Iniciando...</span>
-                    </div>
-                </div>
-                <small class="text-muted d-block text-center" id="deleteReunionProgressDetails">
-                    Preparando eliminación...
-                </small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal de resultado para eliminación de reuniones -->
-<div class="modal fade" id="deleteReunionResultModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header" id="deleteReunionResultHeader">
-                <h5 class="modal-title" id="deleteReunionResultTitle"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="deleteReunionResultMessage"></div>
-            </div>
+            <div class="modal-body" id="resultBody"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<style>
-.table-hover tbody tr:hover {
-    background-color: rgba(23, 162, 184, 0.1);
-}
-
-.btn-group .btn {
-    margin-right: 2px;
-}
-
-.card-header {
-    border-bottom: 3px solid rgba(255, 255, 255, 0.2);
-}
-
-.badge {
-    font-size: 0.75em;
-}
-
-/* Estilos para la barra de progreso de eliminación de reuniones */
-#deleteReunionProgressBar {
-    transition: width 0.4s ease;
-    background: linear-gradient(45deg, #dc3545, #e74c3c);
-}
-
-#deleteReunionProgressModal .modal-content {
-    animation: slideInDown 0.4s ease;
-}
-
-@keyframes slideInDown {
-    from { 
-        opacity: 0; 
-        transform: translateY(-50px); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
-    }
-}
-
-#deleteReunionResultModal .modal-content {
-    animation: zoomIn 0.3s ease;
-}
-
-@keyframes zoomIn {
-    from { 
-        opacity: 0; 
-        transform: scale(0.8); 
-    }
-    to { 
-        opacity: 1; 
-        transform: scale(1); 
-    }
-}
-</style>
-
+{% block scripts %}
 <script>
-    document.querySelector('.btn-info').setAttribute('onclick', "searchTable('reunionesTable')");
-
-    // Función para eliminar reunión con barra de progreso
-    function eliminarReunionConProgreso(reunionId, descripcion, descripcionCompleta) {
-        const mensaje = `¿Está seguro de eliminar la reunión "${descripcion}"?
-
-📋 INFORMACIÓN:
-• Descripción: ${descripcionCompleta || 'Sin descripción'}
-
-⚠️ ADVERTENCIA:
-Esta acción eliminará:
-• La reunión completa
-• Todas las asistencias registradas
-• Todas las multas asociadas
-
-Esta operación NO SE PUEDE DESHACER.
-
-¿Desea continuar?`;
-        
-        if (confirm(mensaje)) {
-            ejecutarEliminacionReunion(reunionId, descripcion);
-        }
-    }
-
-    async function ejecutarEliminacionReunion(reunionId, descripcion) {
-        // Mostrar modal de progreso
-        document.getElementById('deleteReunionTema').textContent = descripcion;
-        
-        const progressModal = new bootstrap.Modal(document.getElementById('deleteReunionProgressModal'));
-        progressModal.show();
-        
-        // Elementos del progreso
-        const progressBar = document.getElementById('deleteReunionProgressBar');
-        const progressText = document.getElementById('deleteReunionProgressText');
-        const progressDetails = document.getElementById('deleteReunionProgressDetails');
-        
-        // Simular progreso mientras se procesa
-        let progress = 0;
-        progressText.textContent = 'Iniciando eliminación...';
-        progressDetails.textContent = 'Conectando con el servidor...';
-        
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 18;
-            if (progress > 90) progress = 90;
-            
-            progressBar.style.width = progress + '%';
-            progressText.textContent = `${Math.round(progress)}%`;
-            
-            if (progress < 25) {
-                progressDetails.textContent = 'Eliminando asistencias asociadas...';
-            } else if (progress < 50) {
-                progressDetails.textContent = 'Eliminando multas asociadas...';
-            } else if (progress < 80) {
-                progressDetails.textContent = 'Eliminando reunión principal...';
-            } else {
-                progressDetails.textContent = 'Finalizando operación...';
-            }
-        }, 300);
-        
-        try {
-            // Enviar petición AJAX optimizada
-            const response = await fetch('/api/reuniones/delete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ reunion_id: reunionId })
+    (function () {
+        var filtro = document.getElementById('filtroTabla');
+        var filas = document.querySelectorAll('.fila');
+        var conteo = document.getElementById('conteoFilas');
+        function actualizar() {
+            var q = (filtro.value || '').trim().toLowerCase(), n = 0;
+            filas.forEach(function (f) {
+                var ok = f.textContent.toLowerCase().indexOf(q) > -1;
+                f.style.display = ok ? '' : 'none';
+                if (ok) n++;
             });
-            
-            const result = await response.json();
-            
-            // Completar barra de progreso
-            clearInterval(progressInterval);
-            progressBar.style.width = '100%';
-            progressText.textContent = '100%';
-            progressDetails.textContent = 'Operación completada!';
-            
-            // Esperar un momento antes de mostrar el resultado
-            setTimeout(() => {
-                progressModal.hide();
-                
-                // Mostrar resultado
-                const resultModal = new bootstrap.Modal(document.getElementById('deleteReunionResultModal'));
-                const resultHeader = document.getElementById('deleteReunionResultHeader');
-                const resultTitle = document.getElementById('deleteReunionResultTitle');
-                const resultMessage = document.getElementById('deleteReunionResultMessage');
-                
-                if (result.success) {
-                    resultHeader.className = 'modal-header bg-success text-white';
-                    resultTitle.innerHTML = '<i class="fas fa-check-circle me-2"></i>Reunión Eliminada';
-                    resultMessage.innerHTML = `
-                        <div class="alert alert-success">
-                            <h6><i class="fas fa-check-circle"></i> ¡Operación completada con éxito!</h6>
-                            <p class="mb-2">${result.message}</p>
-                            <div class="row mt-3">
-                                <div class="col-4 text-center">
-                                    <div class="border p-2 rounded">
-                                        <strong class="text-primary">1</strong>
-                                        <br><small class="text-muted">Reunión</small>
-                                    </div>
-                                </div>
-                                <div class="col-4 text-center">
-                                    <div class="border p-2 rounded">
-                                        <strong class="text-info">${result.asistencias_eliminadas}</strong>
-                                        <br><small class="text-muted">Asistencias</small>
-                                    </div>
-                                </div>
-                                <div class="col-4 text-center">
-                                    <div class="border p-2 rounded">
-                                        <strong class="text-warning">${result.multas_eliminadas}</strong>
-                                        <br><small class="text-muted">Multas</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Recargar página después de un momento
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    resultHeader.className = 'modal-header bg-danger text-white';
-                    resultTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error en la Eliminación';
-                    resultMessage.innerHTML = `
-                        <div class="alert alert-danger">
-                            <h6><i class="fas fa-exclamation-triangle"></i> Ocurrió un error</h6>
-                            <p class="mb-0">${result.error}</p>
-                        </div>
-                    `;
-                }
-                
-                resultModal.show();
-            }, 1000);
-            
-        } catch (error) {
-            clearInterval(progressInterval);
-            console.error('Error:', error);
-            
-            progressModal.hide();
-            
-            // Mostrar error
-            const resultModal = new bootstrap.Modal(document.getElementById('deleteReunionResultModal'));
-            const resultHeader = document.getElementById('deleteReunionResultHeader');
-            const resultTitle = document.getElementById('deleteReunionResultTitle');
-            const resultMessage = document.getElementById('deleteReunionResultMessage');
-            
-            resultHeader.className = 'modal-header bg-danger text-white';
-            resultTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error de Conexión';
-            resultMessage.innerHTML = `
-                <div class="alert alert-danger">
-                    <h6><i class="fas fa-wifi"></i> Error de conexión</h6>
-                    <p class="mb-0">No se pudo conectar con el servidor: ${error.message}</p>
-                </div>
-            `;
-            
-            resultModal.show();
+            conteo.textContent = n + ' reunión' + (n !== 1 ? 'es' : '');
         }
-    }
+        filtro.addEventListener('input', actualizar);
+        actualizar();
+
+        // Eliminación asíncrona optimizada
+        document.querySelectorAll('.btn-eliminar').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var id = this.getAttribute('data-id');
+                var desc = this.getAttribute('data-descripcion');
+                if (!confirm('¿Seguro que deseas eliminar la reunión "' + desc + '" y todas sus asistencias asociadas?')) return;
+
+                var progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+                document.getElementById('progressTema').textContent = desc;
+                progressModal.show();
+
+                try {
+                    var res = await fetch('/api/reuniones/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reunion_id: parseInt(id, 10) })
+                    });
+                    var data = await res.json();
+                    progressModal.hide();
+
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'No se pudo eliminar'));
+                    }
+                } catch (e) {
+                    progressModal.hide();
+                    alert('Error de conexión: ' + e.message);
+                }
+            });
+        });
+    })();
 </script>
 {% endblock %}

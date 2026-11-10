@@ -1,112 +1,140 @@
+# controllers/duenio_controller.py
+# Controlador de propietarios — refactorizado para:
+#   1. Eliminar los if/else de autorización duplicados.
+#   2. Usar db.session.get() en vez del depreciado Query.get().
+#   3. Añadir manejo de errores explícito con try/except.
+#
+# IMPORTANTE: nombres de rutas, Blueprint y columnas de BD sin cambios.
+
 from flask import Blueprint, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
-from models.duenio_model import Duenio
-from models.multa_model import Multa  # Importar el modelo Multa
-from views import duenio_view
-from database import db
+from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_  # Importar or_ para búsquedas
- 
-# Importamos el decorador de roles
+from sqlalchemy import or_
+
+from models.duenio_model import Duenio
+from views import duenio_view
 from utils.decorators import role_required
+from utils.validators import validar_texto, validar_ci
+from database import db
 
 duenio_bp = Blueprint("duenio", __name__)
 
-# Ruta para obtener la lista de duenios con paginación y búsqueda
+
+# ─────────────────────────── LISTADO ─────────────────────────────────────────
+
 @duenio_bp.route("/duenios")
 @login_required
 def list_duenios():
-    # Obtener parámetros de búsqueda y paginación
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)  # 10 registros por página por defecto
-    search = request.args.get('search', '', type=str)
-    
-    # Construir la consulta base
+    """Lista paginada de propietarios con búsqueda por nombre, apellidos o CI."""
+    page     = request.args.get('page',     1,   type=int)
+    per_page = request.args.get('per_page', 10,  type=int)
+    search   = request.args.get('search',   '',  type=str)
+
     query = Duenio.query
-    
-    # Aplicar filtro de búsqueda si existe
     if search:
-        search_filter = f"%{search}%"
+        filtro = f"%{search}%"
         query = query.filter(
             or_(
-                Duenio.nombre.ilike(search_filter),
-                Duenio.paterno.ilike(search_filter), 
-                Duenio.materno.ilike(search_filter),
-                Duenio.ci.ilike(search_filter)
+                Duenio.nombre.ilike(filtro),
+                Duenio.paterno.ilike(filtro),
+                Duenio.materno.ilike(filtro),
+                Duenio.ci.ilike(filtro),
             )
         )
-    
-    # Aplicar paginación
-    duenios_paginated = query.paginate(
-        page=page,
-        per_page=per_page,
-        error_out=False
-    )
-    
+
+    duenios_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
     return duenio_view.list_duenios(duenios_paginated, search)
 
-# Ruta para crear duenios
+
+# ─────────────────────────── CREAR ───────────────────────────────────────────
+
 @duenio_bp.route("/duenios/create", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def create_duenio():
+    """Crea un nuevo propietario."""
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            nombre = request.form["nombre"]
-            paterno = request.form["paterno"]
-            materno = request.form["materno"]
-            ci = request.form["ci"]
-            duenio = Duenio(nombre=nombre, paterno=paterno, materno=materno, ci=ci)
-            try:
-                duenio.save()
-                # Crear una multa con monto 0 para el nuevo duenio
-                # multa = Multa(duenio_id=duenio.id, monto=0)
-                # multa.save()
-                flash("Duenio creado exitosamente", "success")
-            except IntegrityError:
-                db.session.rollback()
-                flash("Error al crear el duenio", "error")
-            return redirect(url_for("duenio.list_duenios"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
+        ok_nom, nombre, err_nom = validar_texto(request.form.get("nombre"), "Nombre", min_len=2, max_len=50)
+        ok_pat, paterno, _ = validar_texto(request.form.get("paterno"), "Apellido paterno", min_len=0, max_len=50, requerido=False)
+        ok_mat, materno, _ = validar_texto(request.form.get("materno"), "Apellido materno", min_len=0, max_len=50, requerido=False)
+        ok_ci, ci, err_ci = validar_ci(request.form.get("ci"))
+
+        if not ok_nom:
+            flash(err_nom, "error")
+            return duenio_view.create_duenio()
+
+        if not ok_ci:
+            flash(err_ci, "error")
+            return duenio_view.create_duenio()
+
+        try:
+            duenio = Duenio(nombre=nombre, paterno=paterno or "", materno=materno or "", ci=ci)
+            duenio.save()
+            flash("Propietario creado exitosamente.", "success")
+        except IntegrityError:
+            db.session.rollback()
+            flash("El CI ingresado ya está registrado para otro propietario.", "error")
+
+        return redirect(url_for("duenio.list_duenios"))
+
     return duenio_view.create_duenio()
 
-# Ruta para actualizar duenios por ID
+
+# ─────────────────────────── ACTUALIZAR ──────────────────────────────────────
+
 @duenio_bp.route("/duenios/<int:id>/update", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
 def update_duenio(id):
-    duenio = Duenio.get_by_id(id)
+    """Actualiza los datos de un propietario."""
+    duenio = db.session.get(Duenio, id)
     if not duenio:
-        return "Duenio no encontrado", 404
+        flash("Propietario no encontrado.", "error")
+        return redirect(url_for("duenio.list_duenios"))
+
     if request.method == "POST":
-        if current_user.has_role("admin"):
-            nombre = request.form["nombre"]
-            paterno = request.form["paterno"]
-            materno = request.form["materno"]
-            ci = request.form["ci"]
-            duenio.update(nombre=nombre, paterno=paterno, materno=materno, ci=ci)
-            flash("Duenio actualizado exitosamente", "success")
-            return redirect(url_for("duenio.list_duenios"))
-        else:
-            return jsonify({"message": "Unauthorized"}), 403
+        ok_nom, nombre, err_nom = validar_texto(request.form.get("nombre"), "Nombre", min_len=2, max_len=50)
+        ok_pat, paterno, _ = validar_texto(request.form.get("paterno"), "Apellido paterno", min_len=0, max_len=50, requerido=False)
+        ok_mat, materno, _ = validar_texto(request.form.get("materno"), "Apellido materno", min_len=0, max_len=50, requerido=False)
+        ok_ci, ci, err_ci = validar_ci(request.form.get("ci"))
+
+        if not ok_nom:
+            flash(err_nom, "error")
+            return duenio_view.update_duenio(duenio)
+
+        if not ok_ci:
+            flash(err_ci, "error")
+            return duenio_view.update_duenio(duenio)
+
+        try:
+            duenio.update(nombre=nombre, paterno=paterno or "", materno=materno or "", ci=ci)
+            flash("Propietario actualizado exitosamente.", "success")
+        except IntegrityError:
+            db.session.rollback()
+            flash("El CI ingresado ya está en uso por otro propietario.", "error")
+
+        return redirect(url_for("duenio.list_duenios"))
+
     return duenio_view.update_duenio(duenio)
 
-# Ruta para eliminar duenios por ID
+
+# ─────────────────────────── ELIMINAR ────────────────────────────────────────
+
 @duenio_bp.route("/duenios/<int:id>/delete", methods=["POST"])
 @login_required
 @role_required("admin")
 def delete_duenio(id):
-    duenio = Duenio.get_by_id(id)
+    """Elimina un propietario y todos sus registros dependientes."""
+    duenio = db.session.get(Duenio, id)
     if not duenio:
-        flash("Duenio no encontrado", "error")
+        flash("Propietario no encontrado.", "error")
         return redirect(url_for("duenio.list_duenios"))
-    if current_user.has_role("admin"):
-        try:
-            duenio.delete()
-            flash("Duenio eliminado exitosamente", "success")
-        except Exception as e:
-            flash("Error al eliminar el duenio", "error")
-        return redirect(url_for("duenio.list_duenios"))
-    else:
-        return jsonify({"message": "Unauthorized"}), 403
+
+    try:
+        duenio.delete()
+        flash("Propietario eliminado exitosamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash("Error al eliminar el propietario.", "error")
+
+    return redirect(url_for("duenio.list_duenios"))

@@ -1,937 +1,509 @@
 <!DOCTYPE html>
-<html lang="es">
-
+<html lang="es" data-bs-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% if csrf_token is defined %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
+    <title>{% block title %}Junta de Vecinos Circuata{% endblock %}</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-bs-theme', t);
+            } catch (e) {}
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-    <title>{% block title %}Sistema de Gestión Comunitaria{% endblock %}</title>
     
+    <!-- Material Design 3 Web Components via CDN -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@material/web/": "https://esm.run/@material/web/"
+        }
+    }
+    </script>
+    <script type="module">
+        import '@material/web/all.js';
+        import {styles as typescaleStyles} from '@material/web/typography/md-typescale-styles.js';
+        if (document.adoptedStyleSheets) {
+            document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
+        }
+    </script>
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            --warning-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-            --dark-gradient: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            --glass-bg: rgba(255, 255, 255, 0.1);
-            --glass-border: rgba(255, 255, 255, 0.2);
-            --shadow-light: 0 8px 32px rgba(31, 38, 135, 0.37);
-            --shadow-strong: 0 15px 35px rgba(0, 0, 0, 0.1);
-            
-            /* Light Theme Variables */
-            --bg-primary: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 25%, #dee2e6 75%, #ced4da 100%);
-            --card-bg: rgba(255, 255, 255, 0.95);
-            --text-primary: #2c3e50;
-            --text-secondary: #495057;
-            --text-muted: #6c757d;
-            --border-color: rgba(0, 0, 0, 0.05);
-            --shadow-color: rgba(0, 0, 0, 0.1);
-            --particle-color: rgba(52, 152, 219, 0.4);
-            --accent-color: #3498db;
-            --accent-hover: #2980b9;
+            --font: 'Roboto', 'Inter', system-ui, -apple-system, sans-serif;
+            --brand: #2457c5;
+            --brand-hover: #1c459d;
+            --brand-ink: #2457c5;
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --surface-2: #f1f3f8;
+            --border: #e0e3eb;
+            --text: #1b1c1e;
+            --text-2: #44474f;
+            --muted: #74777f;
+            --radius: 16px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+            /* Material Design 3 Tokens - Light Theme */
+            --md-sys-color-primary: #2457c5;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #dbe1ff;
+            --md-sys-color-on-primary-container: #00174c;
+            --md-sys-color-surface: #ffffff;
+            --md-sys-color-on-surface: #1b1c1e;
+            --md-sys-color-surface-container: #f1f3f8;
+            --md-sys-color-surface-container-high: #eaeef6;
+            --md-sys-color-outline: #74777f;
+            --md-sys-color-outline-variant: #c4c6d0;
+            --md-sys-shape-corner-medium: 12px;
+            --md-sys-shape-corner-large: 16px;
+
+            --t-brand: 36, 87, 197;
+            --t-success: 18, 140, 76;
+            --t-warning: 196, 112, 8;
+            --t-danger: 208, 48, 48;
+            --t-info: 2, 125, 185;
+            --t-neutral: 90, 104, 125;
+
+            --bs-primary: #2457c5;
+            --bs-primary-rgb: 36, 87, 197;
+            --bs-body-font-family: var(--font);
+            --bs-body-bg: var(--bg);
+            --bs-body-color: var(--text);
+            --bs-border-color: var(--border);
+            --bs-secondary-color: var(--muted);
+            --bs-link-color: var(--brand);
+            --bs-link-color-rgb: 36, 87, 197;
+            --bs-link-hover-color: var(--brand-hover);
+            --bs-link-hover-color-rgb: 28, 69, 157;
         }
 
-        [data-theme="dark"] {
-            /* Dark Theme Variables */
-            --bg-primary: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #3d3d3d 75%, #4a4a4a 100%);
-            --card-bg: rgba(30, 30, 30, 0.95);
-            --text-primary: #e9ecef;
-            --text-secondary: #ced4da;
-            --text-muted: #adb5bd;
-            --border-color: rgba(255, 255, 255, 0.1);
-            --shadow-color: rgba(0, 0, 0, 0.3);
-            --particle-color: rgba(52, 152, 219, 0.6);
-            --accent-color: #5dade2;
-            --accent-hover: #3498db;
+        [data-bs-theme="dark"] {
+            --brand: #a8c8ff;
+            --brand-hover: #c4d8ff;
+            --brand-ink: #a8c8ff;
+            --bg: #111318;
+            --surface: #1a1c22;
+            --surface-2: #21242b;
+            --border: #33363e;
+            --text: #e2e2e9;
+            --text-2: #c4c6cf;
+            --muted: #8e9099;
+            --shadow: none;
+
+            /* Material Design 3 Tokens - Dark Theme */
+            --md-sys-color-primary: #a8c8ff;
+            --md-sys-color-on-primary: #002e70;
+            --md-sys-color-primary-container: #00429a;
+            --md-sys-color-on-primary-container: #dbe1ff;
+            --md-sys-color-surface: #1a1c22;
+            --md-sys-color-on-surface: #e2e2e9;
+            --md-sys-color-surface-container: #21242b;
+            --md-sys-color-surface-container-high: #2a2e37;
+            --md-sys-color-outline: #8e9099;
+            --md-sys-color-outline-variant: #44474f;
+
+            --t-brand: 168, 200, 255;
+            --t-success: 74, 200, 130;
+            --t-warning: 245, 170, 60;
+            --t-danger: 255, 120, 120;
+            --t-info: 90, 185, 240;
+            --t-neutral: 160, 172, 190;
+
+            --bs-body-bg: var(--bg);
+            --bs-body-color: var(--text);
+            --bs-border-color: var(--border);
+            --bs-secondary-color: var(--muted);
+            --bs-link-color: var(--brand-ink);
+            --bs-link-hover-color: #c4d8ff;
+            --bs-link-color-rgb: 168, 200, 255;
+            --bs-link-hover-color-rgb: 196, 216, 255;
         }
 
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
-            background-size: 400% 400%;
-            animation: gradientShift 20s ease infinite;
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-            transition: all 0.3s ease;
-        }
-
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .header-container {
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            margin: 20px;
-            padding: 30px;
-            text-align: center;
-            box-shadow: 0 8px 32px var(--shadow-color);
-            animation: fadeInDown 1s ease-out;
-            transition: all 0.3s ease;
-        }
-
-        .main-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 2.8rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin: 0;
+        /* ---------- Material Design 3 Utilities ---------- */
+        .md3-card {
             position: relative;
-            transition: all 0.3s ease;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
         }
-
-        .main-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100px;
-            height: 3px;
-            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
-            border-radius: 2px;
+        .md3-card md-elevation {
+            --md-elevation-level: 1;
         }
-
-        .subtitle {
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            margin-top: 15px;
-            font-weight: 400;
-            transition: all 0.3s ease;
+        .md3-card:hover md-elevation {
+            --md-elevation-level: 2;
         }
-
-        .navbar-custom {
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
-            border-radius: 15px;
-            margin: 0 20px 20px 20px;
-            box-shadow: 0 8px 32px var(--shadow-color);
-            animation: fadeInUp 1s ease-out;
-            transition: all 0.3s ease;
-            position: relative;
-            z-index: 1030;
-        }
-
-        .navbar-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px var(--shadow-color);
-        }
-
-        .navbar-brand {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
-            font-size: 1.3rem;
-            color: var(--text-primary) !important;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .navbar-brand:hover {
-            transform: scale(1.05);
-            color: var(--accent-color) !important;
-        }
-
-        .nav-link {
-            color: var(--text-secondary) !important;
-            font-weight: 500;
-            padding: 10px 20px !important;
-            border-radius: 10px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .nav-link::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
+        md-outlined-text-field {
             width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(52, 152, 219, 0.1), transparent);
-            transition: all 0.5s ease;
+            --md-outlined-text-field-container-shape: 10px;
+            margin-bottom: 0.25rem;
         }
-
-        .nav-link:hover::before {
-            left: 100%;
-        }
-
-        .nav-link:hover {
-            color: var(--text-primary) !important;
-            background: rgba(52, 152, 219, 0.1);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px var(--shadow-color);
-        }
-
-        .dropdown-menu {
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
-            border-radius: 15px;
-            box-shadow: 0 8px 32px var(--shadow-color);
-            animation: fadeInUp 0.3s ease;
-            z-index: 1040;
-        }
-
-        .dropdown-item {
-            color: var(--text-secondary);
+        md-filled-button, md-outlined-button, md-text-button {
+            --md-filled-button-container-shape: 10px;
+            --md-outlined-button-container-shape: 10px;
+            --md-text-button-container-shape: 10px;
             font-weight: 500;
-            padding: 12px 20px;
-            border-radius: 10px;
-            margin: 5px;
-            transition: all 0.3s ease;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 20px;
         }
 
-        .dropdown-item:hover {
-            background: rgba(52, 152, 219, 0.1);
-            color: var(--text-primary);
-            transform: translateX(5px);
-        }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: .925rem; -webkit-font-smoothing: antialiased; }
+        a { text-decoration: none; }
 
-        .content-container {
-            margin: 20px;
-            animation: fadeIn 1.2s ease-out;
-        }
+        /* ---------- Navegación ---------- */
+        .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1030; padding: .55rem 0; }
+        .app-nav .navbar-brand { display: flex; align-items: center; gap: .6rem; font-weight: 600; font-size: 1rem; color: var(--text); margin-right: 1.5rem; }
+        .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: .85rem; flex: none; }
+        .app-nav .nav-link { color: var(--text-2); font-weight: 500; font-size: .9rem; padding: .45rem .75rem; border-radius: 8px; }
+        .app-nav .nav-link:hover { background: var(--surface-2); color: var(--text); }
+        .app-nav .nav-link.active { background: rgba(var(--t-brand), .1); color: var(--brand-ink); }
+        .navbar-toggler { border-color: var(--border); }
+        [data-bs-theme="dark"] .navbar-toggler-icon { filter: invert(1); }
+        .dropdown-menu { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(16, 24, 40, .12); padding: .35rem; font-size: .875rem; }
+        .dropdown-item { border-radius: 6px; padding: .45rem .7rem; color: var(--text); }
+        .dropdown-item:hover, .dropdown-item:focus { background: var(--surface-2); color: var(--text); }
+        .dropdown-item i { width: 1.2rem; color: var(--muted); }
+        .dropdown-divider { border-color: var(--border); }
 
-        .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            box-shadow: 0 8px 32px var(--shadow-color);
-            transition: all 0.3s ease;
-        }
+        /* ---------- Estructura ---------- */
+        .app-main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 1rem 3rem; }
+        .app-footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 1rem 2rem; }
+        .page-header { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; }
+        .page-title { font-size: 1.4rem; font-weight: 650; letter-spacing: -.01em; margin: 0; display: flex; align-items: center; gap: .65rem; }
+        .page-title i { color: var(--brand-ink); font-size: 1.1rem; }
+        .page-sub { color: var(--muted); margin: .25rem 0 0; }
+        .page-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
-        .glass-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px var(--shadow-color);
-        }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); --bs-card-bg: var(--surface); --bs-card-border-color: var(--border); }
+        .card-header { background: transparent; border-bottom: 1px solid var(--border); padding: .9rem 1.1rem; font-weight: 600; }
+        .card-body { padding: 1.1rem; }
+        .card-title-sm { font-size: .95rem; font-weight: 600; margin: 0; }
+        .table-card { overflow: hidden; }
 
-        /* Floating particles animation */
-        .floating-particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .9rem; margin-bottom: 1.5rem; }
+        .stat { display: flex; gap: .85rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+        .stat-icon { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; font-size: 1rem; flex: none; background: rgba(var(--tone, var(--t-brand)), .12); color: rgb(var(--tone, var(--t-brand))); }
+        .stat-value { font-size: 1.35rem; font-weight: 650; line-height: 1.15; }
+        .stat-label { color: var(--muted); font-size: .8rem; }
 
-        .particle {
-            position: absolute;
-            width: 3px;
-            height: 3px;
-            background: var(--particle-color);
-            border-radius: 50%;
-            animation: float 8s ease-in-out infinite;
-        }
+        .tone-brand { --tone: var(--t-brand); }
+        .tone-success { --tone: var(--t-success); }
+        .tone-warning { --tone: var(--t-warning); }
+        .tone-danger { --tone: var(--t-danger); }
+        .tone-info { --tone: var(--t-info); }
+        .tone-neutral { --tone: var(--t-neutral); }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0; }
-            50% { transform: translateY(-100px) rotate(180deg); opacity: 1; }
-        }
+        .chip { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 550; white-space: nowrap; background: rgba(var(--tone, var(--t-neutral)), .12); color: rgb(var(--tone, var(--t-neutral))); }
 
-        /* Responsive improvements */
-        @media (max-width: 768px) {
-            .main-title {
-                font-size: 2rem;
-            }
-            
-            .header-container,
-            .navbar-custom,
-            .content-container {
-                margin: 10px;
-            }
-        }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(var(--t-brand), .12); color: var(--brand-ink); display: grid; place-items: center; font-weight: 600; font-size: .78rem; flex: none; }
+        .person { display: flex; align-items: center; gap: .75rem; }
+        .person-name { font-weight: 550; line-height: 1.25; }
+        .person-meta { color: var(--muted); font-size: .8rem; }
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 10px;
-        }
+        .toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; padding: .9rem 1rem; border-bottom: 1px solid var(--border); }
+        .toolbar .input-group { max-width: 380px; }
+        .card-foot { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; padding: .8rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
 
-        ::-webkit-scrollbar-track {
-            background: var(--border-color);
-            border-radius: 10px;
-        }
+        .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+        .empty i { font-size: 1.8rem; margin-bottom: .6rem; opacity: .55; display: block; }
+        .empty h6 { color: var(--text); font-weight: 600; margin-bottom: .25rem; }
 
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
-            border-radius: 10px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-        }
+        .quick { display: flex; gap: .8rem; align-items: center; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); transition: border-color .15s, box-shadow .15s; height: 100%; }
+        .quick:hover { border-color: var(--brand); color: var(--text); box-shadow: 0 2px 8px rgba(var(--t-brand), .12); }
+        .quick strong { display: block; font-weight: 600; font-size: .9rem; }
+        .quick span { color: var(--muted); font-size: .8rem; }
+        .section-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 .75rem; }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, var(--accent-hover) 0%, var(--text-primary) 100%);
-        }
+        /* ---------- Tablas ---------- */
+        .table { --bs-table-bg: transparent; --bs-table-hover-bg: var(--surface-2); --bs-table-striped-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--border); margin: 0; vertical-align: middle; }
+        .table > thead th { background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); padding: .7rem 1rem; white-space: nowrap; }
+        .table > tbody td { padding: .8rem 1rem; border-color: var(--border); }
+        .table-sm > tbody td { padding: .55rem .75rem; }
+        .table-sm > thead th { padding: .55rem .75rem; }
+        .table > tbody tr:last-child td { border-bottom: 0; }
+        .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .row-actions { display: flex; gap: .35rem; justify-content: flex-end; }
 
-        /* Loading animation for page transitions */
-        .page-transition {
-            animation: slideInUp 0.6s ease-out;
-        }
+        /* ---------- Botones ---------- */
+        .btn { font-weight: 500; font-size: .875rem; border-radius: 8px; }
+        .btn-sm { font-size: .8rem; }
+        .btn-primary { --bs-btn-bg: var(--brand); --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand-hover); --bs-btn-hover-border-color: var(--brand-hover); --bs-btn-active-bg: var(--brand-hover); --bs-btn-active-border-color: var(--brand-hover); --bs-btn-disabled-bg: var(--brand); --bs-btn-disabled-border-color: var(--brand); --bs-btn-color: #fff; --bs-btn-hover-color: #fff; --bs-btn-active-color: #fff; }
+        .btn-outline-primary { --bs-btn-color: var(--brand-ink); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: rgba(var(--t-brand), .1); --bs-btn-hover-color: var(--brand-ink); --bs-btn-hover-border-color: var(--brand); --bs-btn-active-bg: rgba(var(--t-brand), .16); --bs-btn-active-color: var(--brand-ink); --bs-btn-active-border-color: var(--brand); }
+        .btn-light, .btn-outline-secondary { --bs-btn-bg: var(--surface); --bs-btn-color: var(--text-2); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: var(--surface-2); --bs-btn-hover-color: var(--text); --bs-btn-hover-border-color: var(--border); --bs-btn-active-bg: var(--surface-2); --bs-btn-active-color: var(--text); --bs-btn-active-border-color: var(--border); }
+        .btn-outline-danger { --bs-btn-color: rgb(var(--t-danger)); --bs-btn-border-color: var(--border); --bs-btn-hover-bg: rgba(var(--t-danger), .1); --bs-btn-hover-color: rgb(var(--t-danger)); --bs-btn-hover-border-color: rgb(var(--t-danger)); --bs-btn-active-bg: rgba(var(--t-danger), .16); --bs-btn-active-color: rgb(var(--t-danger)); }
+        .btn-icon { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; }
+        .theme-btn { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; }
 
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        /* ---------- Formularios ---------- */
+        .form-label { font-weight: 550; font-size: .85rem; margin-bottom: .35rem; color: var(--text); }
+        .form-control, .form-select, .input-group-text { border-color: var(--border); background-color: var(--surface); color: var(--text); border-radius: 8px; font-size: .9rem; padding: .55rem .75rem; }
+        .form-control::placeholder { color: var(--muted); opacity: .7; }
+        .form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--t-brand), .18); background-color: var(--surface); color: var(--text); }
+        .input-group-text { background: var(--surface-2); color: var(--muted); }
+        .form-text { color: var(--muted); font-size: .78rem; margin-top: .3rem; }
+        .form-check-input:checked { background-color: var(--brand); border-color: var(--brand); }
+        .form-shell { max-width: 720px; margin: 0 auto; }
+        .form-shell.wide { max-width: 860px; }
+        .form-actions { display: flex; justify-content: flex-end; gap: .6rem; padding-top: 1.25rem; margin-top: 1.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; }
+        .switch-card { display: flex; align-items: center; gap: .9rem; padding: .9rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+        .switch-card .form-check-input { width: 2.6em; height: 1.4em; margin: 0; flex: none; }
+        .notice { display: flex; gap: .7rem; padding: .85rem 1rem; border-radius: var(--radius); background: rgba(var(--t-info), .08); border: 1px solid rgba(var(--t-info), .22); color: var(--text-2); font-size: .85rem; }
+        .notice i { color: rgb(var(--t-info)); margin-top: .15rem; }
+        .notice.warn { background: rgba(var(--t-warning), .08); border-color: rgba(var(--t-warning), .25); }
+        .notice.warn i { color: rgb(var(--t-warning)); }
 
-        @keyframes fadeInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        /* ---------- Alertas, modales, paginación ---------- */
+        .alert { --tone: var(--t-neutral); border-radius: var(--radius); border: 1px solid rgba(var(--tone), .28); background: rgba(var(--tone), .09); color: var(--text); padding: .8rem 1rem; display: flex; gap: .7rem; align-items: flex-start; }
+        .alert-success { --tone: var(--t-success); }
+        .alert-danger { --tone: var(--t-danger); }
+        .alert-warning { --tone: var(--t-warning); }
+        .alert-info { --tone: var(--t-info); }
+        .alert > i:first-child { color: rgb(var(--tone)); margin-top: .2rem; }
+        .alert .btn-close { margin-left: auto; padding: .9rem 1rem; }
+        .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); }
+        .modal-header { border-bottom: 1px solid var(--border); padding: 1rem 1.25rem; }
+        .modal-footer { border-top: 1px solid var(--border); }
+        .modal-title { font-size: 1.05rem; font-weight: 600; }
+        .pagination { --bs-pagination-bg: var(--surface); --bs-pagination-border-color: var(--border); --bs-pagination-color: var(--text-2); --bs-pagination-hover-bg: var(--surface-2); --bs-pagination-hover-color: var(--text); --bs-pagination-hover-border-color: var(--border); --bs-pagination-active-bg: var(--brand); --bs-pagination-active-border-color: var(--brand); --bs-pagination-disabled-bg: var(--surface); --bs-pagination-disabled-border-color: var(--border); --bs-pagination-focus-box-shadow: none; }
+        .progress { height: 8px; background: var(--surface-2); border-radius: 999px; }
+        .progress-bar { background: var(--brand); }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; }
+        .auth-card { width: 100%; max-width: 400px; }
+        .hero { padding: 1.75rem; display: flex; flex-wrap: wrap; gap: 1.25rem; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        .hero h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -.02em; margin: 0 0 .35rem; }
+        .hero p { color: var(--text-2); margin: 0; max-width: 52ch; }
 
-        /* ===== CUSTOM ALERTS STYLES ===== */
-        .custom-alert {
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 8px 32px var(--shadow-color);
-            animation: slideInUp 0.5s ease-out;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border-left: 4px solid;
-        }
+        /* ---------- Compatibilidad con plantillas aún no migradas ---------- */
+        .card.shadow { box-shadow: var(--shadow) !important; }
+        .card-header[class*="bg-"] { background: transparent !important; color: var(--text) !important; border-bottom: 1px solid var(--border); }
+        .card-header[class*="bg-"] .btn-light { --bs-btn-bg: var(--brand); --bs-btn-color: #fff; --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand-hover); --bs-btn-hover-color: #fff; }
+        .table-dark { --bs-table-bg: var(--surface-2); --bs-table-color: var(--muted); }
+        .table-striped > tbody > tr:nth-of-type(odd) > * { --bs-table-bg-type: transparent; }
+        .alert-light { --tone: var(--t-neutral); }
+        .badge { font-weight: 550; }
 
-        .custom-alert:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px var(--shadow-color);
-        }
-
-        .custom-alert::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(52, 152, 219, 0.3), transparent);
-            animation: shimmer 2s ease-in-out infinite;
-        }
-
-        @keyframes shimmer {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 0.8; }
-        }
-
-        .alert-content {
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
-        }
-
-        .alert-icon {
-            flex-shrink: 0;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .alert-message {
-            flex-grow: 1;
-            color: var(--text-primary);
-        }
-
-        .alert-title {
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 4px;
-            color: var(--text-primary);
-        }
-
-        .alert-text {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        .custom-alert-close {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: var(--border-color);
-            border: 1px solid var(--border-color);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 12px;
-        }
-
-        .custom-alert-close:hover {
-            background: rgba(var(--accent-color), 0.1);
-            color: var(--text-secondary);
-            transform: scale(1.1);
-        }
-
-        /* Alert Type Colors */
-        .custom-alert-success {
-            border-left-color: #10B981;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%);
-        }
-
-        .custom-alert-success .alert-icon {
-            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        }
-
-        .custom-alert-error {
-            border-left-color: #EF4444;
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
-        }
-
-        .custom-alert-error .alert-icon {
-            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-        }
-
-        .custom-alert-info {
-            border-left-color: #3B82F6;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
-        }
-
-        .custom-alert-info .alert-icon {
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-
-        .custom-alert-warning {
-            border-left-color: #F59E0B;
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
-        }
-
-        .custom-alert-warning .alert-icon {
-            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-            color: white;
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-        }
-
-        .clear-all-alerts {
-            transition: all 0.3s ease;
-        }
-
-        .clear-all-alerts:hover {
-            background: rgba(var(--accent-color), 0.1) !important;
-            border-color: rgba(var(--accent-color), 0.3) !important;
-            color: var(--text-primary) !important;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px var(--shadow-color);
-        }
-
-        @media (max-width: 768px) {
-            .custom-alert {
-                padding: 15px;
-            }
-            
-            .alert-content {
-                gap: 10px;
-            }
-            
-            .alert-icon {
-                width: 35px;
-                height: 35px;
-                font-size: 16px;
-            }
-            
-            .alert-title {
-                font-size: 15px;
-            }
-            
-            .alert-text {
-                font-size: 13px;
-            }
-        }
-
-        /* ===== THEME TOGGLE BUTTON STYLES ===== */
-        .theme-toggle {
-            padding: 8px 16px !important;
-            border-radius: 25px;
-            font-weight: 500;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .theme-toggle::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(var(--accent-color), 0.2), transparent);
-            transition: all 0.5s ease;
-        }
-
-        .theme-toggle:hover::before {
-            left: 100%;
-        }
-
-        .theme-toggle:hover {
-            background: rgba(var(--accent-color), 0.1) !important;
-            transform: translateY(-1px);
-            box-shadow: 0 3px 10px var(--shadow-color);
-        }
-
-        /* ===== FLOATING THEME TOGGLE BUTTON ===== */
-        .floating-theme-toggle {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 1050;
-        }
-
-        .theme-toggle-float {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--card-bg);
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            font-size: 24px;
-            box-shadow: 0 8px 25px var(--shadow-color);
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .theme-toggle-float:hover {
-            transform: translateY(-3px) scale(1.05);
-            box-shadow: 0 12px 35px var(--shadow-color);
-            background: var(--accent-color);
-            color: white;
-            border-color: var(--accent-color);
-        }
-
-        .theme-toggle-float:active {
-            transform: translateY(-1px) scale(1.02);
-        }
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .floating-theme-toggle {
-                bottom: 20px;
-                right: 20px;
-            }
-
-            .theme-toggle-float {
-                width: 50px;
-                height: 50px;
-                font-size: 20px;
-            }
-        }
-
-        #themeIcon {
-            transition: all 0.3s ease;
-        }
-
-        [data-theme="dark"] #themeIcon {
-            transform: rotate(180deg);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes fadeOutUp {
-            from {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
+        @media (max-width: 575.98px) {
+            .page-actions { width: 100%; }
+            .page-actions .btn { flex: 1; }
+            .hero { padding: 1.25rem; }
+            .app-main { padding-top: 1.25rem; }
         }
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
 
-<body>
-    <!-- Floating particles background -->
-    <div class="floating-particles" id="particles"></div>
+{% macro navlink(ep, prefix, url, icon, label) %}
+<li class="nav-item">
+    <a class="nav-link {{ 'active' if ep.startswith(prefix) else '' }}" href="{{ url }}">
+        <i class="fas {{ icon }} me-1"></i>{{ label }}
+    </a>
+</li>
+{% endmacro %}
 
-    <!-- Header Section -->
-    <div class="header-container">
-        <h1 class="main-title">
-            <i class="fas fa-home me-3"></i>Sistema de Gestión Comunitaria
-        </h1>
-        <p class="subtitle">Administración integral de propietarios y comunidad</p>
-    </div>
+<body class="{% block body_class %}{% endblock %}">
+{% block nav %}
+{% set ep = request.endpoint or '' %}
+<nav class="navbar navbar-expand-lg app-nav">
+    <div class="container-xl">
+        <a class="navbar-brand" href="{{ url_for('user.index') }}">
+            <span class="brand-mark"><i class="fas fa-home"></i></span>
+            <span>Junta de Vecinos Circuata</span>
+        </a>
 
-    <!-- Navigation -->
-    {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-custom">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('user.index') }}">
-                <i class="fas fa-tachometer-alt me-2"></i>Inicio
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" 
-                    style="border: none; background: rgba(255,255,255,0.1); border-radius: 10px;">
-                <span class="navbar-toggler-icon" style="background-image: url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 30 30%27%3e%3cpath stroke=%27rgba%28255, 255, 255, 0.75%29%27 stroke-linecap=%27round%27 stroke-miterlimit=%2710%27 stroke-width=%272%27 d=%27M4 7h22M4 15h22M4 23h22%27/%3e%3c/svg%3e');"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    {% if current_user.has_role("admin") %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownCrear" 
-                           data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                          <i class="fas fa-plus-circle me-2"></i>Crear
-                        </a>
-                        <div class="dropdown-menu" aria-labelledby="navbarDropdownCrear">
-                          <a class="dropdown-item" href="{{ url_for('duenio.create_duenio') }}">
-                              <i class="fas fa-user-plus me-2"></i>Propietario
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('terreno.create_terreno') }}">
-                              <i class="fas fa-map me-2"></i>Terreno
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('reunion.create_reunion') }}">
-                              <i class="fas fa-calendar-plus me-2"></i>Reunión
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('asistencia.create_asistencia') }}">
-                              <i class="fas fa-check-circle me-2"></i>Asistencia
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('cuota.create_cuota') }}">
-                              <i class="fas fa-money-bill me-2"></i>Cuota
-                          </a>
-                        </div>
-                    </li>
-                    {% endif %}
-                    
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownListado" 
-                           data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                          <i class="fas fa-list me-2"></i>Gestionar
-                        </a>
-                        <div class="dropdown-menu" aria-labelledby="navbarDropdownListado">
-                          <a class="dropdown-item" href="{{ url_for('duenio.list_duenios') }}">
-                              <i class="fas fa-users me-2"></i>Propietarios
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('terreno.list_terrenos') }}">
-                              <i class="fas fa-map-marked-alt me-2"></i>Terrenos
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('reunion.list_reuniones') }}">
-                              <i class="fas fa-calendar-alt me-2"></i>Reuniones
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('asistencia.list_asistencias') }}">
-                              <i class="fas fa-clipboard-check me-2"></i>Asistencias
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('cuota.list_cuotas') }}">
-                              <i class="fas fa-receipt me-2"></i>Cuotas
-                          </a>
-                          <a class="dropdown-item" href="{{ url_for('multa.list_multas') }}">
-                              <i class="fas fa-exclamation-triangle me-2"></i>Multas
-                          </a>
-                        </div>
-                    </li>
-                </ul>
-                
-                <ul class="navbar-nav">                    
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownUser" 
-                           data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                          <i class="fas fa-user-circle me-2"></i>{{ current_user.username }}
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
-                          <a class="dropdown-item" href="{{ url_for('user.profile', id=current_user.id) }}">
-                              <i class="fas fa-user-edit me-2"></i>Perfil
-                          </a>
-                          <a class="dropdown-item" href="#" style="opacity: 0.6; cursor: not-allowed;">
-                              <i class="fas fa-cog me-2"></i>Configuración <small>(próximamente)</small>
-                          </a>
-                          <div class="dropdown-divider" style="border-color: rgba(255,255,255,0.2);"></div>
-                          <a class="dropdown-item" href="{{ url_for('user.logout') }}">
-                              <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                          </a>
-                        </div>
-                    </li>
-                </ul>
+        {% if current_user.is_authenticated %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                {{ navlink(ep, 'user.index', url_for('user.index'), 'fa-home', 'Inicio') }}
+                {{ navlink(ep, 'duenio.', url_for('duenio.list_duenios'), 'fa-users', 'Propietarios') }}
+                {{ navlink(ep, 'terreno.', url_for('terreno.list_terrenos'), 'fa-map-marked-alt', 'Terrenos') }}
+                {{ navlink(ep, 'reunion.', url_for('reunion.list_reuniones'), 'fa-calendar-alt', 'Reuniones') }}
+                {{ navlink(ep, 'asistencia.', url_for('asistencia.list_asistencias'), 'fa-clipboard-check', 'Asistencias') }}
+                {{ navlink(ep, 'cuota.', url_for('cuota.list_cuotas'), 'fa-receipt', 'Cuotas') }}
+                {{ navlink(ep, 'multa.', url_for('multa.list_multas'), 'fa-gavel', 'Multas') }}
+                {{ navlink(ep, 'reporte.', url_for('reporte.index'), 'fa-chart-pie', 'Reportes') }}
+            </ul>
+
+            <div class="d-flex align-items-center gap-2">
+                {% if current_user.has_role("admin") %}
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-plus me-1"></i>Nuevo
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ url_for('duenio.create_duenio') }}"><i class="fas fa-user-plus"></i>Propietario</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('terreno.create_terreno') }}"><i class="fas fa-map"></i>Terreno</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('reunion.create_reunion') }}"><i class="fas fa-calendar-plus"></i>Reunión</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('asistencia.create_asistencia') }}"><i class="fas fa-check-circle"></i>Asistencia</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('cuota.create_cuota') }}"><i class="fas fa-money-bill"></i>Cuota</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('multa.create_multa') }}"><i class="fas fa-exclamation-triangle"></i>Multa</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <button class="btn btn-light theme-btn" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
+                    <i class="fas fa-moon" id="themeIcon"></i>
+                </button>
+
+                <div class="dropdown">
+                    <a class="btn btn-light btn-sm dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-user-circle me-1"></i>{{ current_user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ url_for('user.profile', id=current_user.id) }}"><i class="fas fa-user-edit"></i>Perfil</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('user.logout') }}"><i class="fas fa-sign-out-alt"></i>Cerrar sesión</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
-    </nav>
-    {% endif %}
-
-    <!-- Floating Theme Toggle Button -->
-    <div class="floating-theme-toggle">
-        <button class="btn theme-toggle-float" id="themeToggle">
-            <i class="fas fa-moon" id="themeIcon"></i>
-        </button>
+        {% else %}
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <button class="btn btn-light theme-btn" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
+                <i class="fas fa-moon" id="themeIcon"></i>
+            </button>
+            <a href="{{ url_for('user.login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt me-1"></i>Iniciar sesión</a>
+        </div>
+        {% endif %}
     </div>
+</nav>
+{% endblock %}
 
-    <!-- Main Content -->
-    <div class="content-container page-transition">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <!-- Botón para limpiar todas las notificaciones -->
-                <div class="d-flex justify-content-end mb-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm clear-all-alerts" 
-                            style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-secondary); backdrop-filter: blur(10px);">
-                        <i class="fas fa-broom me-1"></i>Limpiar todas las notificaciones
-                    </button>
-                </div>
-                
-                <div id="notifications-container">
-                    {% for category, message in messages %}
-                        <div class="custom-alert custom-alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
-                            <div class="alert-content">
-                                <div class="alert-icon">
-                                    <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' if category == 'success' else 'info-circle' if category == 'info' else 'bell' if category == 'warning' else 'star' }}"></i>
-                                </div>
-                                <div class="alert-message">
-                                    <div class="alert-title">
-                                        {{ 'Error' if category == 'error' else 'Éxito' if category == 'success' else 'Información' if category == 'info' else 'Aviso' if category == 'warning' else 'Notificación' }}
-                                    </div>
-                                    <div class="alert-text">{{ message }}</div>
-                                </div>
-                            </div>
-                            <button type="button" class="custom-alert-close" data-bs-dismiss="alert" aria-label="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+{% block container %}
+<main class="app-main">
+    {% include '_flash.html' %}
+    {% block content %}{% endblock %}
+</main>
+<footer class="app-footer">Sistema de Gestión Comunitaria · Junta de Vecinos Circuata</footer>
+{% endblock %}
 
-        {% block content %}{% endblock %}
-    </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://kit.fontawesome.com/5ab8239d15.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+<script>
+    (function () {
+        var root = document.documentElement;
+        var icon = document.getElementById('themeIcon');
+        var btn = document.getElementById('themeToggle');
 
-    <!-- Bootstrap 5 JS Bundle (incluye Popper) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Font Awesome -->
-    <script src="https://kit.fontawesome.com/5ab8239d15.js" crossorigin="anonymous"></script>
-    <!-- Scripts personalizados -->
-    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+        function paint(theme) {
+            if (icon) icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+        paint(root.getAttribute('data-bs-theme'));
 
-    <script>
-        // Crear partículas flotantes
-        function createParticles() {
-            const container = document.getElementById('particles');
-            const particleCount = 50;
-            
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.top = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 6 + 's';
-                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
-                container.appendChild(particle);
-            }
+        if (btn) {
+            btn.addEventListener('click', function () {
+                var next = root.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+                root.setAttribute('data-bs-theme', next);
+                try { localStorage.setItem('theme', next); } catch (e) {}
+                paint(next);
+            });
         }
 
-        // Efecto de carga suave
-        document.addEventListener('DOMContentLoaded', function() {
-            createParticles();
-            initializeTheme();
-            
-            // Agregar efecto de hover a las cards
-            const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                if (!card.classList.contains('glass-card')) {
-                    card.classList.add('glass-card');
-                }
+        // Alertas de éxito/info se cierran solas
+        setTimeout(function () {
+            document.querySelectorAll('.alert-success, .alert-info').forEach(function (el) {
+                bootstrap.Alert.getOrCreateInstance(el).close();
             });
+        }, 6000);
 
-            // Efecto de typewriter para el título (opcional)
-            const title = document.querySelector('.main-title');
-            if (title) {
-                title.style.opacity = '0';
-                setTimeout(() => {
-                    title.style.opacity = '1';
-                    title.style.animation = 'fadeInDown 1s ease-out';
-                }, 300);
-            }
+        // Confirmación genérica: <form data-confirm="mensaje">
+        document.addEventListener('submit', function (e) {
+            var msg = e.target.getAttribute && e.target.getAttribute('data-confirm');
+            if (msg && !window.confirm(msg)) e.preventDefault();
         });
 
-        // ===== THEME TOGGLE FUNCTIONALITY =====
-        function initializeTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            const themeToggle = document.getElementById('themeToggle');
-            const themeIcon = document.getElementById('themeIcon');
-            const themeText = document.getElementById('themeText');
-            
-            // Aplicar tema guardado
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeButton(savedTheme);
-            
-            // Event listener para el botón de tema
-            if (themeToggle) {
-                themeToggle.addEventListener('click', function() {
-                    const currentTheme = document.documentElement.getAttribute('data-theme');
-                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                    
-                    // Animación de transición suave
-                    document.body.style.transition = 'all 0.3s ease';
-                    
-                    document.documentElement.setAttribute('data-theme', newTheme);
-                    localStorage.setItem('theme', newTheme);
-                    updateThemeButton(newTheme);
-                    
-                    // Remover transición después de cambiar
-                    setTimeout(() => {
-                        document.body.style.transition = '';
-                    }, 300);
+        // Filtro para <select>: <input data-filter-for="id_del_select">
+        document.querySelectorAll('[data-filter-for]').forEach(function (input) {
+            var select = document.getElementById(input.dataset.filterFor);
+            if (!select) return;
+            input.addEventListener('input', function () {
+                var q = input.value.trim().toLowerCase();
+                Array.prototype.forEach.call(select.options, function (opt) {
+                    if (!opt.value) return;
+                    var match = opt.text.toLowerCase().indexOf(q) > -1;
+                    opt.hidden = !match;
+                    opt.disabled = !match;
+                });
+            });
+        });
+
+        // Soporte de compatibilidad para Web Components de Material Design 3 en formularios Flask
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (form && form.tagName === 'FORM') {
+                var mdFields = form.querySelectorAll('md-outlined-text-field');
+                mdFields.forEach(function (field) {
+                    var name = field.getAttribute('name');
+                    if (name) {
+                        var hidden = form.querySelector('input[type="hidden"][name="' + name + '"]');
+                        if (!hidden) {
+                            hidden = document.createElement('input');
+                            hidden.type = 'hidden';
+                            hidden.name = name;
+                            form.appendChild(hidden);
+                        }
+                        hidden.value = field.value || '';
+                    }
+                });
+                var mdChecks = form.querySelectorAll('md-checkbox');
+                mdChecks.forEach(function (cb) {
+                    var name = cb.getAttribute('name');
+                    if (name) {
+                        var hidden = form.querySelector('input[type="hidden"][name="' + name + '"]');
+                        if (cb.checked) {
+                            if (!hidden) {
+                                hidden = document.createElement('input');
+                                hidden.type = 'hidden';
+                                hidden.name = name;
+                                form.appendChild(hidden);
+                            }
+                            hidden.value = cb.value || 'on';
+                        } else if (hidden) {
+                            hidden.remove();
+                        }
+                    }
                 });
             }
-        }
-
-        function updateThemeButton(theme) {
-            const themeIcon = document.getElementById('themeIcon');
-            
-            if (theme === 'dark') {
-                themeIcon.className = 'fas fa-sun';
-            } else {
-                themeIcon.className = 'fas fa-moon';
-            }
-        }
-
-        // Efecto de parallax suave para el scroll
-        window.addEventListener('scroll', () => {
-            const scrolled = window.pageYOffset;
-            const particles = document.querySelectorAll('.particle');
-            particles.forEach((particle, index) => {
-                const speed = (index % 5 + 1) * 0.5;
-                particle.style.transform = `translateY(${scrolled * speed}px)`;
-            });
         });
 
-        // Agregar efecto de ripple a los botones
-        document.addEventListener('click', function(e) {
-            if (e.target.matches('.btn, .nav-link, .dropdown-item')) {
-                const ripple = document.createElement('span');
-                const rect = e.target.getBoundingClientRect();
-                const size = Math.max(rect.width, rect.height);
-                const x = e.clientX - rect.left - size / 2;
-                const y = e.clientY - rect.top - size / 2;
-                
-                ripple.style.cssText = `
-                    position: absolute;
-                    border-radius: 50%;
-                    background: rgba(255, 255, 255, 0.6);
-                    transform: scale(0);
-                    animation: ripple 0.6s linear;
-                    width: ${size}px;
-                    height: ${size}px;
-                    left: ${x}px;
-                    top: ${y}px;
-                    pointer-events: none;
-                `;
-                
-                e.target.style.position = 'relative';
-                e.target.style.overflow = 'hidden';
-                e.target.appendChild(ripple);
-                
-                setTimeout(() => ripple.remove(), 600);
-            }
-        });
-
-        // Funcionalidad para limpiar todas las notificaciones
-        document.addEventListener('click', function(e) {
-            if (e.target.matches('.clear-all-alerts, .clear-all-alerts *')) {
-                const container = document.getElementById('notifications-container');
-                const clearBtn = document.querySelector('.clear-all-alerts').parentElement;
-                
-                if (container) {
-                    // Animar la salida de todas las alertas
-                    const alerts = container.querySelectorAll('.custom-alert');
-                    alerts.forEach((alert, index) => {
-                        setTimeout(() => {
-                            alert.style.animation = 'fadeOutUp 0.4s ease-in forwards';
-                        }, index * 50);
-                    });
-                    
-                    // Remover el contenedor después de las animaciones
-                    setTimeout(() => {
-                        container.remove();
-                        clearBtn.remove();
-                    }, alerts.length * 50 + 400);
+        // Soporte de click para botones submit MD3
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('md-filled-button[type="submit"], md-outlined-button[type="submit"]');
+            if (btn) {
+                var form = btn.closest('form');
+                if (form) {
+                    if (form.requestSubmit) {
+                        form.requestSubmit(btn);
+                    } else {
+                        form.submit();
+                    }
                 }
             }
         });
 
-        // Auto-close notificaciones después de 8 segundos
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.custom-alert');
-            alerts.forEach((alert, index) => {
-                setTimeout(() => {
-                    if (alert.parentElement) {
-                        alert.style.animation = 'fadeOutUp 0.4s ease-in forwards';
-                        setTimeout(() => {
-                            if (alert.parentElement) {
-                                alert.remove();
-                            }
-                        }, 400);
-                    }
-                }, index * 1000); // Escalonado cada segundo
-            });
-        }, 8000);
-    </script>
-
-    <style>
-        @keyframes ripple {
-            to {
-                transform: scale(2);
-                opacity: 0;
-            }
-        }
-    </style>
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
+    })();
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

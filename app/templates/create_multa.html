@@ -1,152 +1,79 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Nueva multa · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-danger text-white py-3">
-                    <h2 class="card-title mb-0 text-center">
-                        <i class="fas fa-exclamation-triangle"></i> Registrar Multa
-                    </h2>
+<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
+    {% call page_header('Nueva multa', 'Se agrega al historial del propietario y a su estado de cuenta', 'fa-gavel') %}{% endcall %}
+
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
+
+        <form method="post" id="createMultaForm">
+            <div class="mb-3">
+                <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">person_pin</span>
+                    Propietario sancionado
+                </label>
+                <input type="text" class="form-control mb-2" data-filter-for="duenio_id" placeholder="Filtrar por nombre o CI..." autocomplete="off">
+                <select id="duenio_id" name="duenio_id" required class="form-select">
+                    <option value="">Selecciona un propietario…</option>
+                    {% for duenio in duenios %}
+                    <option value="{{ duenio.id }}">{{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="tipo" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">category</span>
+                        Tipo de sanción
+                    </label>
+                    <select id="tipo" name="tipo" required class="form-select">
+                        <option value="">Selecciona un motivo…</option>
+                        <option value="asistencia">Inasistencia a reunión</option>
+                        <option value="cuota">Incumplimiento de cuota</option>
+                    </select>
                 </div>
-                <div class="card-body p-4">
-                    <form method="post">
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <label for="duenio_id" class="form-label">
-                                    <i class="fas fa-user"></i> Propietario
-                                </label>
-                                <select id="duenio_id" name="duenio_id" required class="form-select form-select-lg">
-                                    <option value="">Seleccionar propietario...</option>
-                                    {% for duenio in duenios %}
-                                        <option value="{{ duenio.id }}">
-                                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} - CI: {{ duenio.ci }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">
-                                    Seleccione el propietario que recibirá la multa
-                                </small>
-                            </div>
-
-                            <div class="col-md-6 mb-4">
-                                <label for="monto" class="form-label">
-                                    <i class="fas fa-dollar-sign"></i> Monto de la Multa
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text">Bs.</span>
-                                    <input type="number" id="monto" name="monto" class="form-control form-control-lg" 
-                                           step="0.01" min="0" required placeholder="0.00">
-                                </div>
-                                <small class="form-text text-muted">
-                                    Ingrese el monto de la multa en bolivianos
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <label for="tipo" class="form-label">
-                                    <i class="fas fa-tags"></i> Tipo de Multa
-                                </label>
-                                <select id="tipo" name="tipo" required class="form-select form-select-lg">
-                                    <option value="">Seleccionar tipo...</option>
-                                    <option value="inasistencia">Inasistencia a Reunión</option>
-                                    <option value="cuota_atrasada">Cuota Atrasada</option>
-                                    <option value="infraccion">Infracción a Reglamentos</option>
-                                    <option value="daños">Daños a Propiedad Común</option>
-                                    <option value="otros">Otros</option>
-                                </select>
-                                <small class="form-text text-muted">
-                                    Seleccione el motivo de la multa
-                                </small>
-                            </div>
-
-                            <div class="col-md-6 mb-4">
-                                <label for="descripcion" class="form-label">
-                                    <i class="fas fa-comment-alt"></i> Descripción (Opcional)
-                                </label>
-                                <textarea id="descripcion" name="descripcion" class="form-control" 
-                                          rows="3" placeholder="Detalles adicionales sobre la multa..."></textarea>
-                                <small class="form-text text-muted">
-                                    Proporcione detalles adicionales si es necesario
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-warning" role="alert">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Importante:</strong> Esta multa se agregará al historial del propietario y será visible en su estado de cuenta.
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ url_for('multa.list_multas') }}" class="btn btn-outline-secondary me-md-2">
-                                <i class="fas fa-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-danger">
-                                <i class="fas fa-save"></i> Registrar Multa
-                            </button>
-                        </div>
-                    </form>
+                <div class="col-md-6">
+                    <md-outlined-text-field
+                        label="Monto (Bs.)"
+                        id="monto"
+                        name="monto"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        required>
+                        <md-icon slot="leading-icon" class="material-symbols-outlined">payments</md-icon>
+                    </md-outlined-text-field>
                 </div>
             </div>
-        </div>
+
+            <div class="mb-4">
+                <md-outlined-text-field
+                    label="Descripción detallada (opcional)"
+                    id="descripcion"
+                    name="descripcion"
+                    type="textarea"
+                    rows="3"
+                    placeholder="Detalles sobre el motivo o resolución de la multa...">
+                    <md-icon slot="leading-icon" class="material-symbols-outlined">notes</md-icon>
+                </md-outlined-text-field>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('multa.list_multas') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Registrar multa
+                </md-filled-button>
+            </div>
+        </form>
     </div>
 </div>
-
-<style>
-    .card {
-        border-radius: 0.5rem;
-        border: none;
-    }
-    
-    .card-header {
-        border-radius: 0.5rem 0.5rem 0 0 !important;
-        border-bottom: none;
-        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
-    }
-    
-    .form-control:focus, .form-select:focus {
-        border-color: #dc3545;
-        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-    }
-    
-    .btn-danger {
-        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        border: none;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-danger:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-        background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-text {
-        font-size: 0.8rem;
-    }
-    
-    .input-group-text {
-        background-color: #dc3545;
-        color: white;
-        border: none;
-        font-weight: 600;
-    }
-    
-    .alert-warning {
-        border-left: 4px solid #ffc107;
-        background-color: #fff3cd;
-        border-color: #ffeaa7;
-    }
-</style>
 {% endblock %}

@@ -1,497 +1,155 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat, initials, empty_state, pagination %}
+
+{% block title %}Asistencias · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-user-check"></i> Gestión de Asistencias
-                        </h4>
-                        {% if current_user.has_role('admin') %}
-                        <a href="{{ url_for('asistencia.create_asistencia') }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-plus"></i> Nueva Asistencia
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Barra de búsqueda optimizada -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <form method="GET" action="{{ url_for('asistencia.list_asistencias') }}">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-search"></i>
-                                    </span>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           name="search" 
-                                           value="{{ search or '' }}" 
-                                           placeholder="Buscar por propietario, CI, reunión...">
-                                    <button class="btn btn-outline-secondary" type="submit">
-                                        <i class="fas fa-search"></i> Buscar
-                                    </button>
-                                    {% if search %}
-                                    <a href="{{ url_for('asistencia.list_asistencias') }}" class="btn btn-outline-warning">
-                                        <i class="fas fa-times"></i> Limpiar
-                                    </a>
+{% call page_header('Asistencias', 'Participación de los propietarios en las asambleas', 'fa-clipboard-check') %}
+    {% if current_user.has_role('admin') %}
+    <a href="{{ url_for('asistencia.create_asistencia') }}" class="text-decoration-none">
+        <md-filled-button>
+            <md-icon slot="icon" class="material-symbols-outlined">add_task</md-icon>
+            Registrar asistencia
+        </md-filled-button>
+    </a>
+    {% endif %}
+{% endcall %}
+
+{% if stats is defined and stats %}
+<div class="stats">
+    {{ stat('Total registros', stats.total_asistencias, 'fa-clipboard-list', 'info') }}
+    {{ stat('Presentes', stats.total_presentes, 'fa-user-check', 'success') }}
+    {{ stat('Ausentes', stats.total_ausentes, 'fa-user-times', 'danger') }}
+    {{ stat('Reuniones', stats.reuniones_unicas, 'fa-calendar-alt', 'brand') }}
+</div>
+{% elif asistencias %}
+{% set total_presentes = asistencias|selectattr('asistio', 'equalto', True)|list|length %}
+<div class="stats">
+    {{ stat('Registros', asistencias|length, 'fa-clipboard-list', 'info') }}
+    {{ stat('Presentes', total_presentes, 'fa-user-check', 'success') }}
+    {{ stat('Ausentes', asistencias|length - total_presentes, 'fa-user-times', 'danger') }}
+</div>
+{% endif %}
+
+<div class="md3-card table-card p-0" style="position: relative; overflow: hidden;">
+    <md-elevation></md-elevation>
+
+    <div class="toolbar p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <form method="GET" action="{{ url_for('asistencia.list_asistencias') }}" class="d-flex gap-2 flex-grow-1" style="max-width: 480px;">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0"><span class="material-symbols-outlined">search</span></span>
+                <input type="text" class="form-control border-start-0" name="search" value="{{ search or '' }}" placeholder="Propietario, CI o tema de reunión...">
+            </div>
+            <md-filled-button type="submit">Buscar</md-filled-button>
+            {% if search %}
+            <a href="{{ url_for('asistencia.list_asistencias') }}" class="text-decoration-none">
+                <md-outlined-button type="button">Limpiar</md-outlined-button>
+            </a>
+            {% endif %}
+        </form>
+        {% if asistencias_paginated and asistencias_paginated.total > 0 %}
+        <span class="text-muted small">
+            Página {{ asistencias_paginated.page }} de {{ asistencias_paginated.pages }} · {{ asistencias_paginated.total }} registros
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="asistenciasTable">
+            <thead>
+                <tr>
+                    <th class="ps-3">Propietario</th>
+                    <th>Reunión</th>
+                    <th>Fecha y hora</th>
+                    <th>Estado de asistencia</th>
+                    {% if current_user.has_role('admin') %}<th class="text-end pe-3">Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for asistencia in asistencias %}
+                <tr>
+                    <td class="ps-3">
+                        <div class="person">
+                            <div class="avatar" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
+                                {{ initials(asistencia.dueno.nombre, asistencia.dueno.paterno) if asistencia.dueno else '?' }}
+                            </div>
+                            <div>
+                                <div class="person-name fw-medium">
+                                    {% if asistencia.dueno %}
+                                    {{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno or '' }} {{ asistencia.dueno.materno or '' }}
+                                    {% else %}
+                                    <span class="text-danger">Propietario no encontrado</span>
                                     {% endif %}
                                 </div>
+                                <div class="person-meta small text-muted">CI: {{ asistencia.dueno.ci if asistencia.dueno else '—' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">{{ asistencia.reunion.descripcion if asistencia.reunion else 'Reunión #' ~ asistencia.id_reunion }}</div>
+                    </td>
+                    <td>
+                        <div class="num small">{{ asistencia.reunion.fecha.strftime('%d/%m/%Y') if (asistencia.reunion and asistencia.reunion.fecha) else 'Sin fecha' }}</div>
+                        <div class="text-muted small"><i class="fas fa-clock me-1"></i>{{ asistencia.reunion.hora.strftime('%H:%M') if (asistencia.reunion and asistencia.reunion.hora) else '' }}</div>
+                    </td>
+                    <td>
+                        {% if asistencia.asistio %}
+                        <span class="chip tone-success"><i class="fas fa-check-circle me-1"></i>Presente</span>
+                        {% else %}
+                        <span class="chip tone-danger"><i class="fas fa-times-circle me-1"></i>Ausente (Multado)</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.has_role('admin') %}
+                    <td class="pe-3">
+                        <div class="row-actions justify-content-end gap-1">
+                            <a href="{{ url_for('asistencia.update_asistencia', id=asistencia.id) }}" class="btn btn-light btn-icon btn-sm" title="Editar asistencia">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
+                            </a>
+                            <form method="post" action="{{ url_for('asistencia.delete_asistencia', id=asistencia.id) }}"
+                                  data-confirm="¿Eliminar el registro de asistencia de {{ asistencia.dueno.nombre if asistencia.dueno else 'este propietario' }}?">
+                                <button type="submit" class="btn btn-outline-danger btn-icon btn-sm" title="Eliminar">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
+                                </button>
                             </form>
                         </div>
-                    </div>
-
-                    {% if asistencias %}
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6><i class="fas fa-chart-line"></i> Estadísticas Generales</h6>
-                            <div class="row">
-                                {% set duenos_unicos = asistencias|map(attribute='dueno.id')|unique|list %}
-                                {% set total_duenos = duenos_unicos|length %}
-                                {% set total_asistencias = asistencias|length %}
-                                {% set total_presentes = asistencias|selectattr('asistio', 'equalto', True)|list|length %}
-                                {% set promedio_asistencia = ((total_presentes / total_asistencias) * 100)|round|int if total_asistencias > 0 else 0 %}
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-info">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-info">
-                                                <i class="fas fa-users"></i> Propietarios
-                                            </h5>
-                                            <h3 class="text-info">{{ total_duenos }}</h3>
-                                            <small class="text-muted">Con registros</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-success">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-success">
-                                                <i class="fas fa-calendar-check"></i> Total
-                                            </h5>
-                                            <h3 class="text-success">{{ total_asistencias }}</h3>
-                                            <small class="text-muted">Registros de reuniones</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-primary">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-primary">
-                                                <i class="fas fa-user-check"></i> Presentes
-                                            </h5>
-                                            <h3 class="text-primary">{{ total_presentes }}</h3>
-                                            <small class="text-muted">Asistieron</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-warning">
-                                        <div class="card-body text-center">
-                                            <h5 class="text-warning">
-                                                <i class="fas fa-percentage"></i> Promedio
-                                            </h5>
-                                            <h3 class="text-warning">{{ promedio_asistencia }}%</h3>
-                                            <small class="text-muted">De asistencia general</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    </td>
                     {% endif %}
-                    
-                    <!-- Información de paginación -->
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <div class="row text-center">
-                                    <div class="col-md-3">
-                                        <h6><i class="fas fa-list"></i> Total de registros</h6>
-                                        <strong>{{ asistencias_paginated.total }}</strong>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <h6><i class="fas fa-eye"></i> Mostrando</h6>
-                                        <strong>{{ asistencias_paginated.items|length }} registros</strong>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <h6><i class="fas fa-file"></i> Página</h6>
-                                        <strong>{{ asistencias_paginated.page }} de {{ asistencias_paginated.pages }}</strong>
-                                    </div>
-                                    <div class="col-md-3">
-                                        {% if search %}
-                                        <h6><i class="fas fa-filter"></i> Filtrado</h6>
-                                        <strong>"{{ search }}"</strong>
-                                        {% else %}
-                                        <h6><i class="fas fa-filter"></i> Sin filtros</h6>
-                                        <small class="text-muted">Todos los registros</small>
-                                        {% endif %}
-                                    </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="dueniosTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Propietario</th>
-                                    <th>Resumen de Asistencias</th>
-                                    <th>Porcentaje</th>
-                                    <th>Ver Detalles</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% set duenos_procesados = [] %}
-                                {% for asistencia in asistencias %}
-                                    {% if asistencia.dueno.id not in duenos_procesados %}
-                                        {% set _ = duenos_procesados.append(asistencia.dueno.id) %}
-                                        {% set asistencias_dueno = asistencias|selectattr('dueno.id', 'equalto', asistencia.dueno.id)|list %}
-                                        {% set asistio_count = asistencias_dueno|selectattr('asistio', 'equalto', True)|list|length %}
-                                        {% set no_asistio_count = asistencias_dueno|selectattr('asistio', 'equalto', False)|list|length %}
-                                        {% set total_dueno = asistencias_dueno|length %}
-                                        {% set porcentaje = ((asistio_count / total_dueno) * 100)|round|int if total_dueno > 0 else 0 %}
-                                        
-                                        <tr>
-                                            <td><strong>#{{ asistencia.dueno.id }}</strong></td>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="me-3">
-                                                        <i class="fas fa-user-circle fa-2x text-primary"></i>
-                                                    </div>
-                                                    <div>
-                                                        <strong>{{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno or '' }} {{ asistencia.dueno.materno or '' }}</strong>
-                                                        <br><small class="text-muted">{{ asistencia.dueno.email or 'Sin email' }}</small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex gap-2">
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check"></i> {{ asistio_count }} Asistió
-                                                    </span>
-                                                    <span class="badge bg-danger">
-                                                        <i class="fas fa-times"></i> {{ no_asistio_count }} Faltó
-                                                    </span>
-                                                </div>
-                                                <small class="text-muted d-block mt-1">Total: {{ total_dueno }} reuniones</small>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    {% if porcentaje >= 80 %}
-                                                        <span class="badge bg-success fs-6">{{ porcentaje }}%</span>
-                                                        <i class="fas fa-smile text-success ms-2"></i>
-                                                    {% elif porcentaje >= 60 %}
-                                                        <span class="badge bg-warning fs-6">{{ porcentaje }}%</span>
-                                                        <i class="fas fa-meh text-warning ms-2"></i>
-                                                    {% else %}
-                                                        <span class="badge bg-danger fs-6">{{ porcentaje }}%</span>
-                                                        <i class="fas fa-frown text-danger ms-2"></i>
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-outline-info btn-sm verAsistenciasBtn"
-                                                    data-dueno="{{ asistencia.dueno.id }}"
-                                                    data-nombre="{{ asistencia.dueno.nombre }} {{ asistencia.dueno.paterno or '' }}"
-                                                    data-asistencias='[{% for ast in asistencias_dueno %}{"id": {{ ast.id }}, "fecha": "{{ ast.reunion.fecha.strftime('%d/%m/%Y') if ast.reunion.fecha else 'Sin fecha' }}", "hora": "{{ ast.reunion.hora.strftime('%H:%M') if ast.reunion.hora else 'Sin hora' }}", "descripcion": "{{ ast.reunion.descripcion or 'Reunión general' }}", "asistio": {{ ast.asistio|lower }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
-                                                    <i class="fas fa-eye"></i> Ver Historial
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    {% endif %}
-                                {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <i class="fas fa-users fa-3x mb-3 text-muted opacity-50"></i>
-                                            <h5 class="text-muted">Sin registros</h5>
-                                            <p class="mb-0">No hay registros de asistencia de propietarios</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Controles de paginación -->
-                    {% if asistencias_paginated.pages > 1 %}
-                    <div class="d-flex justify-content-between align-items-center mt-4">
-                        <div>
-                            <span class="text-muted">
-                                <i class="fas fa-info-circle"></i>
-                                Mostrando {{ asistencias_paginated.items|length }} de {{ asistencias_paginated.total }} registros
-                                {% if search %}(filtrado de "{{ search }}"){% endif %}
-                            </span>
-                        </div>
-                        <nav aria-label="Navegación de asistencias">
-                            <ul class="pagination pagination-sm mb-0">
-                                {% if asistencias_paginated.has_prev %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('asistencia.list_asistencias', page=1, search=search) }}">
-                                        <i class="fas fa-angle-double-left"></i>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('asistencia.list_asistencias', page=asistencias_paginated.prev_num, search=search) }}">
-                                        <i class="fas fa-angle-left"></i>
-                                    </a>
-                                </li>
-                                {% endif %}
-                                
-                                {% set start_page = (asistencias_paginated.page - 2) if (asistencias_paginated.page - 2) > 1 else 1 %}
-                                {% set end_page = (asistencias_paginated.page + 3) if (asistencias_paginated.page + 3) <= asistencias_paginated.pages else (asistencias_paginated.pages + 1) %}
-                                {% for page_num in range(start_page, end_page) %}
-                                <li class="page-item {{ 'active' if page_num == asistencias_paginated.page else '' }}">
-                                    <a class="page-link" href="{{ url_for('asistencia.list_asistencias', page=page_num, search=search) }}">
-                                        {{ page_num }}
-                                    </a>
-                                </li>
-                                {% endfor %}
-                                
-                                {% if asistencias_paginated.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('asistencia.list_asistencias', page=asistencias_paginated.next_num, search=search) }}">
-                                        <i class="fas fa-angle-right"></i>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('asistencia.list_asistencias', page=asistencias_paginated.pages, search=search) }}">
-                                        <i class="fas fa-angle-double-right"></i>
-                                    </a>
-                                </li>
-                                {% endif %}
-                            </ul>
-                        </nav>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para ver asistencias -->
-<div class="modal fade" id="verAsistenciasModal" tabindex="-1" aria-labelledby="verAsistenciasModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-info text-white">
-        <h5 class="modal-title" id="verAsistenciasModalLabel">
-          <i class="fas fa-clipboard-check"></i> Historial de Asistencias - <span id="nombreDueno"></span>
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div id="contenidoAsistencias">
-          <div class="text-center">
-            <div class="spinner-border text-info" role="status">
-              <span class="visually-hidden">Cargando...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times"></i> Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<style>
-.table-hover tbody tr:hover {
-    background-color: rgba(40, 167, 69, 0.1);
-}
-.btn-group .btn { margin-right: 2px; }
-.card-header { border-bottom: 3px solid rgba(255, 255, 255, 0.2); }
-.badge { font-size: 0.75em; }
-</style>
-
-<script>
-// Variable global para el modal
-let modalAsistencias = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar el modal
-    const modalElement = document.getElementById('verAsistenciasModal');
-    if (modalElement) {
-        modalAsistencias = new bootstrap.Modal(modalElement);
-    }
-    
-    // Manejar clicks en los botones "Ver"
-    document.querySelectorAll('.verAsistenciasBtn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const duenioId = this.dataset.dueno;
-            const nombreDuenio = this.dataset.nombre;
-            const asistenciasData = this.dataset.asistencias ? JSON.parse(this.dataset.asistencias) : [];
-            
-            // Actualizar título del modal
-            document.getElementById('nombreDueno').textContent = nombreDuenio;
-            
-            // Mostrar spinner mientras carga
-            document.getElementById('contenidoAsistencias').innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-info" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando historial de asistencias...</p>
-                </div>`;
-            
-            // Mostrar modal
-            if (modalAsistencias) {
-                modalAsistencias.show();
-            }
-            
-            // Generar contenido del historial
-            setTimeout(() => {
-                mostrarHistorialAsistencias(duenioId, nombreDuenio, asistenciasData);
-            }, 500);
-        });
-    });
-});
-
-function mostrarHistorialAsistencias(duenioId, nombreDuenio, asistenciasData) {
-    // Construir la tabla de asistencias
-    let contenidoHTML = `
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th><i class="fas fa-calendar text-info"></i> Fecha</th>
-                        <th><i class="fas fa-clock text-warning"></i> Hora</th>
-                        <th><i class="fas fa-comment text-primary"></i> Descripción</th>
-                        <th><i class="fas fa-user-check text-success"></i> Estado</th>
-                        <th class="text-center"><i class="fas fa-cogs"></i> Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-    if (asistenciasData && asistenciasData.length > 0) {
-        asistenciasData.forEach(asistencia => {
-            const estadoBadge = asistencia.asistio 
-                ? '<span class="badge bg-success"><i class="fas fa-check"></i> Asistió</span>'
-                : '<span class="badge bg-danger"><i class="fas fa-times"></i> No asistió</span>';
-            
-            contenidoHTML += `
+                </tr>
+                {% else %}
                 <tr>
-                    <td>
-                        <strong class="text-dark">${asistencia.fecha || 'Sin fecha'}</strong>
+                    <td colspan="5">
+                        {% if search %}
+                            {% call empty_state('fa-search', 'Sin resultados', 'No hay asistencias que coincidan con "' ~ search ~ '"') %}
+                                <a href="{{ url_for('asistencia.list_asistencias') }}" class="btn btn-light btn-sm">Ver todas</a>
+                            {% endcall %}
+                        {% else %}
+                            {% call empty_state('fa-clipboard-check', 'No hay asistencias', 'Crea una reunión para generar las asistencias automáticamente.') %}
+                                {% if current_user.has_role('admin') %}
+                                <a href="{{ url_for('reunion.create_reunion') }}" class="btn btn-primary btn-sm">Programar reunión</a>
+                                {% endif %}
+                            {% endcall %}
+                        {% endif %}
                     </td>
-                    <td>
-                        <span class="badge bg-light text-dark">
-                            <i class="fas fa-clock"></i> ${asistencia.hora || 'Sin hora'}
-                        </span>
-                    </td>
-                    <td>
-                        <small class="text-muted">${asistencia.descripcion || 'Reunión general'}</small>
-                    </td>
-                    <td>${estadoBadge}</td>
-                    <td class="text-center">
-                        <div class="btn-group btn-group-sm">
-                            <a href="/asistencias/${asistencia.id}/update" 
-                               class="btn btn-outline-info btn-sm" 
-                               title="Editar asistencia">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button onclick="confirmarEliminacion(${asistencia.id})" 
-                                    class="btn btn-outline-danger btn-sm" 
-                                    title="Eliminar registro">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>`;
-        });
-        
-        // Calcular estadísticas
-        const totalReuniones = asistenciasData.length;
-        const asistenciasConfirmadas = asistenciasData.filter(a => a.asistio).length;
-        const porcentaje = totalReuniones > 0 ? Math.round((asistenciasConfirmadas / totalReuniones) * 100) : 0;
-        
-        let colorPorcentaje = 'text-danger';
-        if (porcentaje >= 80) colorPorcentaje = 'text-success';
-        else if (porcentaje >= 60) colorPorcentaje = 'text-warning';
-        
-        contenidoHTML += `
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Resumen de estadísticas -->
-        <div class="row mt-3">
-            <div class="col-12">
-                <div class="alert alert-light border">
-                    <div class="row text-center">
-                        <div class="col-md-4">
-                            <i class="fas fa-calendar-check text-success"></i>
-                            <strong class="d-block">Reuniones totales</strong>
-                            <span class="text-muted">${totalReuniones}</span>
-                        </div>
-                        <div class="col-md-4">
-                            <i class="fas fa-user-check text-primary"></i>
-                            <strong class="d-block">Asistencias</strong>
-                            <span class="text-success">${asistenciasConfirmadas}</span>
-                        </div>
-                        <div class="col-md-4">
-                            <i class="fas fa-percent text-info"></i>
-                            <strong class="d-block">Porcentaje</strong>
-                            <span class="${colorPorcentaje}">${porcentaje}%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    } else {
-        contenidoHTML += `
-            <tr>
-                <td colspan="5" class="text-center text-muted py-5">
-                    <div class="d-flex flex-column align-items-center">
-                        <i class="fas fa-clipboard-list fa-3x mb-3 text-muted opacity-50"></i>
-                        <h5 class="text-muted">Sin registros</h5>
-                        <p class="mb-0">No hay registros de asistencia para <strong>${nombreDuenio}</strong></p>
-                    </div>
-                </td>
-            </tr>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
-    </div>`;
-    }
-    
-    // Actualizar contenido del modal
-    document.getElementById('contenidoAsistencias').innerHTML = contenidoHTML;
-}
+    </div>
 
-function confirmarEliminacion(asistenciaId) {
-    if (confirm('¿Está seguro de que desea eliminar este registro de asistencia?\\n\\nEsta acción no se puede deshacer.')) {
-        // Crear formulario para eliminar
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/asistencias/${asistenciaId}/delete`;
-        
-        // Agregar token CSRF si existe
-        const csrfToken = document.querySelector('meta[name=csrf-token]');
-        if (csrfToken) {
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrf_token';
-            csrfInput.value = csrfToken.getAttribute('content');
-            form.appendChild(csrfInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-</script>
+    {% if asistencias_paginated and asistencias_paginated.pages > 1 %}
+    <div class="card-foot p-3 border-top d-flex justify-content-between align-items-center">
+        <form method="GET" action="{{ url_for('asistencia.list_asistencias') }}" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="search" value="{{ search or '' }}">
+            <span class="small text-muted">Mostrar</span>
+            <select name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                {% for n in [10, 20, 50, 100] %}
+                <option value="{{ n }}" {% if request.args.get('per_page', '20') == n|string %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+            <span class="small text-muted">por página</span>
+        </form>
+        {{ pagination(asistencias_paginated, 'asistencia.list_asistencias', search=search) }}
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

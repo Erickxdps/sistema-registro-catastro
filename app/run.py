@@ -8,6 +8,7 @@ from controllers import duenio_controller
 from controllers import terreno_controller
 from controllers import cuota_controller
 from controllers import multa_controller
+from controllers import reporte_controller
 from database import db
 from models.user_model import User
 
@@ -44,6 +45,7 @@ app.register_blueprint(reunion_controller.reunion_bp)
 app.register_blueprint(terreno_controller.terreno_bp)
 app.register_blueprint(cuota_controller.cuota_bp)
 app.register_blueprint(multa_controller.multa_bp)
+app.register_blueprint(reporte_controller.reporte_bp)
 
 def create_default_users():
     """Crear usuarios por defecto si no existen"""

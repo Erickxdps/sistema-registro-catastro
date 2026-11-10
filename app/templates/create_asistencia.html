@@ -1,150 +1,67 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+
+{% block title %}Registrar asistencia · Junta de Vecinos Circuata{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-success text-white py-3">
-                    <h2 class="card-title mb-0 text-center">
-                        <i class="fas fa-clipboard-check"></i> Registrar Asistencia
-                    </h2>
+<div class="form-shell" style="max-width: 680px; margin: 0 auto;">
+    {% call page_header('Registrar asistencia', 'Indica si el propietario estuvo presente en la reunión', 'fa-clipboard-check') %}{% endcall %}
+
+    <div class="md3-card" style="position: relative;">
+        <md-elevation></md-elevation>
+
+        <form method="post" id="createAsistenciaForm">
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="duenio_id" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">person</span>
+                        Propietario
+                    </label>
+                    <input type="text" class="form-control mb-2" data-filter-for="duenio_id" placeholder="Filtrar por nombre o CI..." autocomplete="off">
+                    <select id="duenio_id" name="duenio_id" required class="form-select">
+                        <option value="">Selecciona un propietario…</option>
+                        {% for duenio in duenios %}
+                        <option value="{{ duenio.id }}" {% if request.args.get('duenio_id') == duenio.id|string %}selected{% endif %}>
+                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} · CI {{ duenio.ci }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="card-body p-4">
-                    <form method="post">
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <label for="duenio_id" class="form-label">
-                                    <i class="fas fa-user"></i> Propietario
-                                </label>
-                                <select id="duenio_id" name="duenio_id" required class="form-select form-select-lg">
-                                    <option value="">Seleccionar propietario...</option>
-                                    {% for duenio in duenios %}
-                                        <option value="{{ duenio.id }}" 
-                                            {% if request.args.get('duenio_id') == duenio.id|string %}selected{% endif %}>
-                                            {{ duenio.nombre }} {{ duenio.paterno }} {{ duenio.materno }} - CI: {{ duenio.ci }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">
-                                    Seleccione el propietario que asistió o no a la reunión
-                                </small>
-                            </div>
-
-                            <div class="col-md-6 mb-4">
-                                <label for="id_reunion" class="form-label">
-                                    <i class="fas fa-calendar-alt"></i> Reunión
-                                </label>
-                                <select id="id_reunion" name="id_reunion" required class="form-select form-select-lg">
-                                    <option value="">Seleccionar reunión...</option>
-                                    {% for reunion in reuniones %}
-                                        <option value="{{ reunion.id }}"
-                                            {% if request.args.get('reunion_id') == reunion.id|string %}selected{% endif %}>
-                                            {{ reunion.fecha }} {{ reunion.hora }} - {{ reunion.descripcion if reunion.descripcion else 'Sin descripción' }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">
-                                    Seleccione la reunión correspondiente
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="row justify-content-center mb-4">
-                            <div class="col-md-6">
-                                <div class="card border-success">
-                                    <div class="card-body text-center">
-                                        <div class="form-check form-switch d-flex justify-content-center align-items-center">
-                                            <input class="form-check-input me-3" type="checkbox" id="asistio" name="asistio" style="transform: scale(1.5);">
-                                            <label class="form-check-label fs-5 fw-bold" for="asistio">
-                                                <i class="fas fa-user-check text-success"></i> ¿Asistió a la reunión?
-                                            </label>
-                                        </div>
-                                        <small class="form-text text-muted mt-2 d-block">
-                                            Active esta opción si el propietario estuvo presente
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ url_for('asistencia.list_asistencias') }}" class="btn btn-outline-secondary me-md-2">
-                                <i class="fas fa-arrow-left"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-save"></i> Registrar Asistencia
-                            </button>
-                        </div>
-                    </form>
+                <div class="col-md-6">
+                    <label for="id_reunion" class="form-label fw-semibold mb-1 d-flex align-items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">calendar_today</span>
+                        Reunión
+                    </label>
+                    <input type="text" class="form-control mb-2" data-filter-for="id_reunion" placeholder="Filtrar por fecha..." autocomplete="off">
+                    <select id="id_reunion" name="id_reunion" required class="form-select">
+                        <option value="">Selecciona una reunión…</option>
+                        {% for reunion in reuniones %}
+                        <option value="{{ reunion.id }}" {% if request.args.get('reunion_id') == reunion.id|string %}selected{% endif %}>
+                            {{ reunion.fecha }} {{ reunion.hora }} · {{ reunion.descripcion if reunion.descripcion else 'Sin descripción' }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
-        </div>
+
+            <div class="p-3 rounded mb-4" style="background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem;">
+                <md-checkbox id="asistio" name="asistio" value="on" touch-target="wrapper"></md-checkbox>
+                <label for="asistio" class="mb-0 user-select-none" style="cursor: pointer;">
+                    <div class="fw-semibold">¿Asistió a la reunión?</div>
+                    <div class="text-muted small">Marca la casilla si el propietario estuvo presente físicamente o representado.</div>
+                </label>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
+                <a href="{{ url_for('asistencia.list_asistencias') }}" class="text-decoration-none">
+                    <md-text-button type="button">Cancelar</md-text-button>
+                </a>
+                <md-filled-button type="submit">
+                    <md-icon slot="icon" class="material-symbols-outlined">save</md-icon>
+                    Registrar asistencia
+                </md-filled-button>
+            </div>
+        </form>
     </div>
 </div>
-
-<style>
-    .card {
-        border-radius: 0.5rem;
-        border: none;
-    }
-    
-    .card-header {
-        border-radius: 0.5rem 0.5rem 0 0 !important;
-        border-bottom: none;
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
-    }
-    
-    .form-control:focus, .form-select:focus {
-        border-color: #28a745;
-        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-    }
-    
-    .form-check-input:checked {
-        background-color: #28a745;
-        border-color: #28a745;
-    }
-    
-    .form-check-input:focus {
-        border-color: #28a745;
-        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-    }
-    
-    .btn-success {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        border: none;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-success:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-        background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-text {
-        font-size: 0.8rem;
-    }
-    
-    .border-success {
-        border-color: #28a745 !important;
-    }
-    
-    .card-body .card {
-        transition: all 0.3s ease;
-    }
-    
-    .card-body .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);
-    }
-</style>
 {% endblock %}
